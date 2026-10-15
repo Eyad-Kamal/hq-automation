@@ -11,3 +11,7 @@ venv/
 
 # Note: notion-ids.json is intentionally NOT ignored. It holds Notion data source ids,
 # which are not secrets (a token is still required to read or write anything).
+
+# Local token files - never commit
+notion-token*
+*.api
