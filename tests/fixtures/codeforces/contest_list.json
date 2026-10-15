@@ -1,0 +1,32 @@
+{
+  "status": "OK",
+  "result": [
+    {
+      "id": 2065,
+      "name": "Codeforces Round 1000 (Div. 2)",
+      "type": "CF",
+      "phase": "BEFORE",
+      "frozen": false,
+      "durationSeconds": 7200,
+      "startTimeSeconds": 1792499700
+    },
+    {
+      "id": 2064,
+      "name": "Educational Codeforces Round 180 (Rated for Div. 2)",
+      "type": "CF",
+      "phase": "FINISHED",
+      "frozen": false,
+      "durationSeconds": 10800,
+      "startTimeSeconds": 1790000000
+    },
+    {
+      "id": 2066,
+      "name": "Codeforces Round 1001 (Div. 3)",
+      "type": "CF",
+      "phase": "BEFORE",
+      "frozen": false,
+      "durationSeconds": 7500,
+      "startTimeSeconds": 1793102400
+    }
+  ]
+}

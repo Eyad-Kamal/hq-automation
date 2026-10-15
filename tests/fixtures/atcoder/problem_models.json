@@ -1,0 +1,6 @@
+{
+  "abc300_d": {"slope": -20.0, "intercept": 9.1, "variance": 0.01, "difficulty": 120, "discrimination": 0.9, "irt_loglikelihood": -10.0, "irt_users": 500.0, "is_experimental": false},
+  "abc380_a": {"slope": -25.0, "intercept": 10.0, "variance": 0.02, "difficulty": 1350, "discrimination": 1.1, "irt_loglikelihood": -9.0, "irt_users": 800.0, "is_experimental": false},
+  "abc380_b": {"slope": -30.0, "intercept": 11.0, "variance": 0.03, "is_experimental": true},
+  "ahc073_a": {"slope": -1.0, "intercept": 4.0, "variance": 0.5, "difficulty": 3884, "discrimination": 0.1, "irt_loglikelihood": -2.0, "irt_users": 40.0, "is_experimental": false}
+}

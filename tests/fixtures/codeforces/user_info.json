@@ -1,0 +1,15 @@
+{
+  "status": "OK",
+  "result": [
+    {
+      "handle": "Tourist",
+      "rating": 3800,
+      "maxRating": 3900,
+      "rank": "legendary grandmaster"
+    },
+    {
+      "handle": "tester",
+      "maxRating": 1550
+    }
+  ]
+}

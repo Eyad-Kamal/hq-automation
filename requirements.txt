@@ -1,0 +1,5 @@
+# Runtime
+requests>=2.31
+tzdata>=2024.1
+# Tests (pytest is also used by the workflow only through this file; it is harmless in CI)
+pytest>=8.0

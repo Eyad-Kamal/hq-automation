@@ -1,0 +1,5 @@
+[
+  {"id": "abc300", "start_epoch_second": 1790000000, "duration_second": 3600, "title": "AtCoder Beginner Contest 300", "rate_change": "All"},
+  {"id": "abc380", "start_epoch_second": 1790100000, "duration_second": 6000, "title": "AtCoder Beginner Contest 380", "rate_change": "All"},
+  {"id": "ahc073", "start_epoch_second": 1790000000, "duration_second": 14400, "title": "AtCoder Heuristic Contest 073", "rate_change": "All"}
+]

@@ -1,0 +1,5 @@
+[
+  {"IsRated": true, "Place": 1234, "OldRating": 1500, "NewRating": 1520, "Performance": 1600, "InnerPerformance": 1580, "ContestScreenName": "abc300", "ContestName": "AtCoder Beginner Contest 300", "EndTime": "2024-01-20T21:00:00+09:00"},
+  {"IsRated": false, "Place": 0, "OldRating": 0, "NewRating": 0, "Performance": 0, "InnerPerformance": 0, "ContestScreenName": "practice", "ContestName": "Practice Contest", "EndTime": "2024-02-01T21:00:00+09:00"},
+  {"IsRated": true, "Place": 900, "OldRating": 1520, "NewRating": 1490, "Performance": 1400, "InnerPerformance": 1410, "ContestScreenName": "arc170", "ContestName": "AtCoder Regular Contest 170", "EndTime": "2024-03-01T20:00:00+09:00"}
+]

@@ -1,0 +1,23 @@
+{
+  "status": "OK",
+  "result": [
+    {
+      "contestId": 1985,
+      "contestName": "Codeforces Round 955 (Div. 2)",
+      "handle": "tester",
+      "rank": 1543,
+      "ratingUpdateTimeSeconds": 1790000000,
+      "oldRating": 1500,
+      "newRating": 1550
+    },
+    {
+      "contestId": 1990,
+      "contestName": "Codeforces Round 960 (Div. 2)",
+      "handle": "tester",
+      "rank": 980,
+      "ratingUpdateTimeSeconds": 1790600000,
+      "oldRating": 1550,
+      "newRating": 1512
+    }
+  ]
+}

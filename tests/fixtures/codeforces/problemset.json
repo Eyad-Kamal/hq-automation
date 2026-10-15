@@ -1,0 +1,14 @@
+{
+  "status": "OK",
+  "result": {
+    "problems": [
+      {"contestId": 1985, "index": "C", "name": "Permutation Swap", "type": "PROGRAMMING", "rating": 1200, "tags": ["greedy", "math"]},
+      {"contestId": 1990, "index": "A", "name": "Trust Nobody", "type": "PROGRAMMING", "tags": ["implementation"]},
+      {"index": "Z", "name": "Malformed without contest id", "type": "PROGRAMMING", "tags": []}
+    ],
+    "problemStatistics": [
+      {"contestId": 1985, "index": "C", "solvedCount": 15000},
+      {"contestId": 1990, "index": "A", "solvedCount": 40000}
+    ]
+  }
+}

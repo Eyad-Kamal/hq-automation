@@ -1,0 +1,60 @@
+# MUST CPC Training HQ: scheduled automation.
+#
+# Runs `python -m hq.main auto` every 10 minutes (GitHub starts scheduled runs late,
+# sometimes twice; every job is idempotent, and the "concurrency" block below
+# queues overlapping runs instead of running them side by side).
+#
+# Manual runs: Actions -> HQ -> Run workflow. Pick a job (default "auto") and tick
+# "force" to ignore the due checks (25-minute import guard, once-a-day, once-a-week).
+#
+# Secrets (Settings -> Secrets and variables -> Actions):
+#   NOTION_TOKEN         required
+#   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM   optional (email alerts)
+name: HQ
+
+on:
+  schedule:
+    - cron: "3-59/10 * * * *"
+  workflow_dispatch:
+    inputs:
+      job:
+        description: "Job to run"
+        type: choice
+        default: auto
+        options: [auto, onboard, contests, alerts, imports, recompute, daily, weekly]
+      force:
+        description: "Ignore the due checks (import guard, once-a-day, once-a-week)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: hq
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run HQ job
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          SMTP_FROM: ${{ secrets.SMTP_FROM }}
+        run: python -m hq.main "${{ inputs.job || 'auto' }}" ${{ inputs.force && '--force' || '' }}

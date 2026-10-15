@@ -1,0 +1,20 @@
+{
+  "two-sum": {
+    "difficulty": "Easy",
+    "topicTags": [
+      {"name": "Array", "slug": "array"},
+      {"name": "Hash Table", "slug": "hash-table"}
+    ]
+  },
+  "word-break": {
+    "difficulty": "Medium",
+    "topicTags": [
+      {"name": "Array", "slug": "array"},
+      {"name": "Hash Table", "slug": "hash-table"},
+      {"name": "String", "slug": "string"},
+      {"name": "Dynamic Programming", "slug": "dynamic-programming"},
+      {"name": "Trie", "slug": "trie"},
+      {"name": "Memoization", "slug": "memoization"}
+    ]
+  }
+}
