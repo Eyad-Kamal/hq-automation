@@ -224,6 +224,8 @@ def test_weekly_due_only_after_saturday_0010_cairo() -> None:
 
 def test_weekly_summaries_mvp_and_report() -> None:
     w = _weekly_setup(admin="user-admin")
+    # Only this week (the test looks at one row per member); history is covered in test_round2.
+    w.notion.seed(S.DB_CONFIG, {S.P_Config.TITLE: nt.p_title("WEEKLY_BACKFILL_WEEKS"), S.P_Config.NUMBER: nt.p_number(1)})
     result = weekly.run(w.context(now=NOW_SATURDAY))
     assert result.result == "OK"
 

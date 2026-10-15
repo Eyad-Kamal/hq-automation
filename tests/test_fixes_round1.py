@@ -378,18 +378,18 @@ def test_F6_coach_override_wins_over_auto_tier() -> None:
     onboard.run(w.context())
     _set_queue(w, "strings", w.eyad, **{S.P_LearningQueue.QUEUE_STATUS: nt.p_status("Learning"), S.P_LearningQueue.AUTO_TIER: nt.p_select("Unseen"), S.P_LearningQueue.COACH_OVERRIDE: nt.p_select("Master")})
     daily.run(w.context())
-    task = _tasks_of(w, w.eyad, "Topic Practice")[0]
-    assert get_relation(task, S.P_Tasks.TOPIC) == [w.topics["greedy"]], "Master by the coach: strings is skipped"
+    # Learning rows are the only candidates (change #1). The one Learning row is Master by
+    # the coach, so it is skipped and no other topic is used: no practice task today.
+    assert _tasks_of(w, w.eyad, "Topic Practice") == []
 
 
-def test_F6_topic_with_no_problems_moves_to_the_next_queued_core_topic() -> None:
+def test_F6_topic_with_no_problems_creates_no_task_when_learning_rows_exist() -> None:
     w = build_world()
     w.sources.problemset = [{"key": "CF-1000B", "name": "Bee", "link": "https://x", "rating": 1000, "tags": ["greedy"]}]
     onboard.run(w.context())
     _set_queue(w, "strings", w.eyad, **{S.P_LearningQueue.QUEUE_STATUS: nt.p_status("Learning"), S.P_LearningQueue.PRIORITY: nt.p_select("Very Important")})
-    daily.run(w.context())  # no strings problems exist, so the greedy queued topic is used
-    task = _tasks_of(w, w.eyad, "Topic Practice")[0]
-    assert get_relation(task, S.P_Tasks.TOPIC) == [w.topics["greedy"]]
+    daily.run(w.context())  # no strings problems exist; with a Learning row, queued topics are not used (change #1)
+    assert _tasks_of(w, w.eyad, "Topic Practice") == []
 
 
 # ---------------------------------------------------------------------------

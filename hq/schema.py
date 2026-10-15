@@ -509,6 +509,7 @@ class Platform:
     """Values of Contests."Platform" and Rating History."Platform"."""
 
     CODEFORCES = "Codeforces"
+    CF_GYM = "CF Gym"
     ATCODER = "AtCoder"
     LEETCODE = "LeetCode"
 
@@ -574,6 +575,10 @@ class ConfigKey:
     ADMIN_USER_ID = "ADMIN_USER_ID"
     IMPORT_BACKFILL_DAYS = "IMPORT_BACKFILL_DAYS"  # added by B3: first-import window (days)
     IMPORT_MAX_CREATES = "IMPORT_MAX_CREATES"  # added by B3 (fix round 1): creates per import run
+    UPSOLVE_WINDOW_DAYS = "UPSOLVE_WINDOW_DAYS"  # upsolve reminders only for contests that ended this many days ago
+    DAILY_LOG_DAYS = "DAILY_LOG_DAYS"  # Daily Log rows recomputed per member (days back from today)
+    WEEKLY_BACKFILL_WEEKS = "WEEKLY_BACKFILL_WEEKS"  # complete past weeks whose Weekly Summary rows are kept filled
+    DASHBOARDS_AUTO = "DASHBOARDS_AUTO"  # 1 = create personal dashboard pages for members with an empty Dashboard URL
 
 
 # CF tag vocabulary (options of "CF Tags" on Topics and Problems).

@@ -155,6 +155,10 @@ Do not delete rows. The important ones:
 | `LC_EASY` / `LC_MEDIUM` / `LC_HARD` | 1000 / 1400 / 1900 | Rating used for LeetCode difficulty |
 | `MODE_UPSOLVE` / `MODE_EDITORIAL` | 0.7 / 0.5 | Score multipliers for upsolved and editorial-assisted problems |
 | `IMPORT_MAX_CREATES` | 400 | Most new rows one import run may create. The rest is imported by later runs, so a large first backfill takes several runs |
+| `UPSOLVE_WINDOW_DAYS` | 14 | Upsolve reminders only for contests that ended within this many days. Older open auto Upsolve tasks become Skipped |
+| `DAILY_LOG_DAYS` | 60 | Daily Log days recomputed per member (back from today) |
+| `WEEKLY_BACKFILL_WEEKS` | 12 | Complete past weeks whose Weekly Summary rows are kept filled (no reports or MVP for older weeks) |
+| `DASHBOARDS_AUTO` | 1 | 1 = create a personal dashboard page for each active member with an empty Dashboard URL. 0 = off |
 | `FREEZE_EVERY` / `FREEZE_MAX` | 7 / 2 | A freeze is earned per 7 active days, up to 2 |
 | `TIER_*`, `BAND_*_FACTOR`, `MODE_*`, `GATE_L1..L4` | see the blueprint | Mastery, scoring and level gates |
 | `ADMIN_USER_ID` | empty | Notion user id mentioned on each weekly report. Leave empty to skip the mention. Find your id with the Notion API (`GET /v1/users`, using the integration token). This path is not verified in this repository. |
@@ -213,10 +217,10 @@ Common messages:
 - **Unofficial APIs.** LeetCode and AtCoder have no official data APIs for this. The code uses
   their public endpoints. They can change without notice. LeetCode shows only the last 50
   accepted submissions. Older LeetCode solves are not imported.
-- **Contest names for imported live contests.** A solve does not carry the contest name. When a
-  trainee solves a contest live and no contest row exists, the job creates a placeholder such as
-  `Codeforces contest 1985` (Kind may read "CF Other"). Rename it in the Contests database; the
-  link to the entries is kept.
+- **Contest names for imported live contests.** A solve does not carry the contest name. The
+  import now reads the real name, start and duration from Codeforces `contest.list` (regular and
+  gym). A placeholder such as `Codeforces contest 1985` is only left when that list does not
+  know the contest; the import renames existing placeholders on each run.
 - **Upsolve detection** needs both the live solve and the later practice solve to be seen by the same import run,
   or the live solve must already be recorded as a Contest Entry. An upsolve that happens long after the live contest,
   outside the import window, can be missed.

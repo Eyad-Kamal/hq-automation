@@ -29,6 +29,7 @@ log = logging.getLogger(__name__)
 
 NOTION_API = "https://api.notion.com/v1"
 NOTION_VERSION = "2025-09-03"
+VIEWS_VERSION = "2026-03-11"  # the create-view reference's version; the chart config is only documented for it
 MAX_TRIES = 5
 RICH_TEXT_LIMIT = 2000  # Notion limit per rich-text item
 APPEND_CHILDREN_LIMIT = 100  # Notion limit of children per append request
@@ -66,10 +67,10 @@ class Notion:
     def __repr__(self) -> str:  # never leak the token
         return "Notion(token=<redacted>)"
 
-    def _headers(self) -> dict[str, str]:
+    def _headers(self, version: str | None = None) -> dict[str, str]:
         return {
             "Authorization": f"Bearer {self._token}",
-            "Notion-Version": NOTION_VERSION,
+            "Notion-Version": version or NOTION_VERSION,
             "Content-Type": "application/json",
         }
 
@@ -90,6 +91,7 @@ class Notion:
         params: dict[str, Any] | None = None,
         body: Json | None = None,
         retry_server_errors: bool = True,
+        version: str | None = None,
     ) -> Json:
         """Perform one API call with throttling and retries; return decoded JSON.
 
@@ -109,7 +111,7 @@ class Notion:
                 resp = self._session.request(
                     method,
                     url,
-                    headers=self._headers(),
+                    headers=self._headers(version),
                     params=params,
                     json=body,
                     timeout=DEFAULT_TIMEOUT,
@@ -183,6 +185,21 @@ class Notion:
             body["children"] = children
         # Not retried on 5xx or network errors: the row may already exist.
         return self._call("POST", "/pages", body=body, retry_server_errors=False)
+
+    def create_child_page(self, parent_page_id: str, title: str, children: Sequence[Json] | None = None) -> Json:
+        """Create a page under another page (not retried: the page may already exist)."""
+        body: Json = {
+            "parent": {"type": "page_id", "page_id": parent_page_id},
+            "properties": {"title": {"title": rich_text(title)}},
+        }
+        if children:
+            body["children"] = list(children)[:APPEND_CHILDREN_LIMIT]
+        return self._call("POST", "/pages", body=body, retry_server_errors=False)
+
+    def create_view(self, body: Json) -> Json:
+        """Create a database view, e.g. a linked view on a page (``create_database``). Views
+        in the chart configuration need Notion-Version 2026-03-11 (see hq.jobs.dashboards)."""
+        return self._call("POST", "/views", body=body, retry_server_errors=False, version=VIEWS_VERSION)
 
     def block_children(self, block_id: str, page_size: int = 100) -> list[Json]:
         """The first page of child blocks of a page (``page_size=1`` to test emptiness)."""

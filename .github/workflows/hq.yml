@@ -21,7 +21,7 @@ on:
         description: "Job to run"
         type: choice
         default: auto
-        options: [auto, onboard, contests, alerts, imports, recompute, daily, weekly]
+        options: [auto, onboard, contests, alerts, imports, recompute, daily, weekly, backfill-weekly]
       force:
         description: "Ignore the due checks (import guard, once-a-day, once-a-week)"
         type: boolean

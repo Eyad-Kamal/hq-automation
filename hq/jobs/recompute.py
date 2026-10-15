@@ -9,7 +9,7 @@ For each active member (and then for teams and goals on full runs):
 * A day is active when it has a solved problem or an attended contest.
   ``streak.compute`` over all active days gives current/best streak, freezes
   and frozen days.
-* Daily Log rows for the last 14 days plus today are upserted by Source Key
+* Daily Log rows for the last DAILY_LOG_DAYS days (default 60) plus today are upserted by Source Key
   "<member id>:<YYYY-MM-DD>". Minutes and Reflection are never written.
 * Members get points today/this week/last week/total, problem count, streak,
   freezes and last active date. Teams get the sums of their members.
@@ -39,6 +39,7 @@ from hq import schema as S
 from hq.config import num
 from hq.jobs import OK, WARNING, Context, JobResult
 from hq.logic import achievements, goals, mastery, scoring, streak
+from hq.logic.problem_ref import identities
 from hq.repo import (
     Member,
     Repo,
@@ -53,6 +54,7 @@ from hq.repo import (
     get_status,
     get_text,
     get_title,
+    get_url,
 )
 from hq.schema import ConfigKey as K
 from hq.schema import Mode
@@ -61,7 +63,6 @@ from hq.timeutil import week_label, week_start
 log = logging.getLogger("hq.jobs.recompute")
 
 JOB = "recompute"
-WINDOW_DAYS = 14
 ATTENDED_STATUSES = frozenset({"Attended", "Upsolving", "Upsolved"})
 COMPETENT_OR_MORE = frozenset({"Competent", "Proficient", "Master"})
 ADDITIVE_GOALS = frozenset({"Problems Solved", "Points", "Contests Attended", "Topics ≥ Competent", "Problems ≥ Rating"})
@@ -123,27 +124,70 @@ def _member_problems(
     cfg: dict[str, Any],
     duplicates: list[str],
 ) -> list[Solved]:
-    """Solved problems of one member. A second row with the same Source Key (or Problem
-    Key) is ignored and recorded in ``duplicates`` (F1)."""
+    """Solved problems of one member. Rows that name the same problem are one solve: rows
+    sharing a Source Key, a normalized Problem Key, or a normalized Link are grouped, the
+    row with the earliest Solved On is kept, and the others are recorded in ``duplicates``
+    (F1). A Warning is logged for each ignored row."""
     lc_map = _lc_map(cfg)
     upsolve = num(cfg, K.MODE_UPSOLVE)
     editorial = num(cfg, K.MODE_EDITORIAL)
-    solved: list[Solved] = []
-    seen: set[str] = set()
+    candidates: list[dict] = []
     for page in repo.rows(S.DB_PROBLEMS):
         if get_status(page, S.P_Problems.STATUS) != "Solved":
             continue
         if member.id not in get_relation(page, S.P_Problems.MEMBER):
             continue
-        key = get_text(page, S.P_Problems.SOURCE_KEY) or get_text(page, S.P_Problems.PROBLEM_KEY)
-        if key in seen:
-            duplicates.append(f"Problems {key}")
+        candidates.append(page)
+
+    # Group rows that share any identity (union-find over the identity strings).
+    parent = list(range(len(candidates)))
+
+    def find(i: int) -> int:
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    owner: dict[str, int] = {}
+    for i, page in enumerate(candidates):
+        idents = identities(get_text(page, S.P_Problems.PROBLEM_KEY), get_url(page, S.P_Problems.LINK))
+        source = get_text(page, S.P_Problems.SOURCE_KEY).strip().lower()
+        if source:
+            idents.add(f"src:{source}")
+        for ident in idents:
+            if ident in owner:
+                parent[find(i)] = find(owner[ident])
+            else:
+                owner[ident] = i
+
+    groups: dict[int, list[int]] = {}
+    for i in range(len(candidates)):
+        groups.setdefault(find(i), []).append(i)
+
+    def solved_on_key(i: int) -> tuple[int, str]:
+        when = get_date(candidates[i], S.P_Problems.SOLVED_ON)
+        return (0, when.isoformat()) if when is not None else (1, "")
+
+    keep: set[int] = set()
+    for members_of_group in groups.values():
+        first = min(members_of_group, key=solved_on_key)
+        keep.add(first)
+        for i in members_of_group:
+            if i == first:
+                continue
+            label = get_text(candidates[i], S.P_Problems.SOURCE_KEY) or get_text(candidates[i], S.P_Problems.PROBLEM_KEY)
+            duplicates.append(f"Problems {label}")
+            log.warning("duplicate solve ignored for %s: %s (kept the earliest Solved On)", member.name, label)
+
+    lc = _lc_map(cfg)
+    solved: list[Solved] = []
+    for i, page in enumerate(candidates):
+        if i not in keep:
             continue
-        seen.add(key)
         rating_value = get_number(page, S.P_Problems.RATING)
         rating = int(rating_value) if rating_value is not None else None
         difficulty = get_select(page, S.P_Problems.DIFFICULTY)
-        effective = scoring.effective_rating(rating, difficulty, lc_map)
+        effective = scoring.effective_rating(rating, difficulty, lc)
         mode = get_select(page, S.P_Problems.MODE) or Mode.PRACTICE
         at_solve = get_number(page, S.P_Problems.RATING_AT_SOLVE)
         ref_here = int(at_solve) if at_solve is not None else ref
@@ -268,6 +312,7 @@ def run(ctx: Context) -> JobResult:
     errors: list[str] = []
     duplicates: list[str] = []
 
+    who_fixed = _fill_who_team(repo, members)
     for member in members:
         try:
             results[member.id] = _recompute_member(ctx, member, topics, today, duplicates)
@@ -280,7 +325,12 @@ def run(ctx: Context) -> JobResult:
         _update_goals(ctx, repo, results, members)
 
     items = repo.writes - writes_before
-    details = [f"members recomputed: {len(results)}/{len(members)}", f"writes: {items}", *errors]
+    details = [
+        f"members recomputed: {len(results)}/{len(members)}",
+        f"writes: {items}",
+        f"Who/Team filled or corrected: {who_fixed}",
+        *errors,
+    ]
     if duplicates:
         details.append(f"duplicate rows ignored ({len(duplicates)}): " + "; ".join(sorted(set(duplicates))))
     result = WARNING if (errors or duplicates) else OK
@@ -309,7 +359,8 @@ def _recompute_member(
     # Daily Log: the window plus today. Minutes and Reflection are never touched.
     team = repo.team_name(member.team_ids[0]) if member.team_ids else None
     target = daily_target(member, cfg)
-    for offset in range(-WINDOW_DAYS, 1):
+    window_days = max(0, int(num(cfg, K.DAILY_LOG_DAYS)))
+    for offset in range(-window_days, 1):
         day = today + timedelta(days=offset)
         stat = stats.get(day, DayStat())
         day_streak = streak.compute(active, day, freeze_every, freeze_max).current
@@ -366,6 +417,66 @@ def _recompute_member(
     _award_badges(repo, member, stat_values, today)
     _sync_practice_tasks(repo, member)
     return MemberResult(stats=stat_values, solved=solved)
+
+
+def _fill_who_team(repo: Repo, members: list[Member]) -> int:
+    """Set "Who" (and the Problems "Team" select) from the linked member, so rows created
+    by hand (no Who) are grouped under the right person in charts. Team-mode Contest
+    Entries and Team-scope Goals with no Member take the team name as Who. Only differing
+    values are written. Returns the number of rows changed."""
+    by_id = {m.id: m for m in members}
+    team_names = {t["id"]: get_title(t, S.P_Teams.TITLE) for t in repo.rows(S.DB_TEAMS)}
+
+    def member_of(row: dict, prop: str) -> Member | None:
+        for member_id in get_relation(row, prop):
+            if member_id in by_id:
+                return by_id[member_id]
+        return None
+
+    def team_of(member: Member) -> str | None:
+        return team_names.get(member.team_ids[0]) if member.team_ids else None
+
+    changed = 0
+    for row in repo.rows(S.DB_PROBLEMS):
+        member = member_of(row, S.P_Problems.MEMBER)
+        if member is None:
+            continue
+        props = {S.P_Problems.WHO: nt.p_select(member.name)}
+        if team_of(member):  # a member without a team never clears a Team set by hand
+            props[S.P_Problems.TEAM] = nt.p_select(team_of(member))
+        changed += 1 if repo.sync(S.DB_PROBLEMS, row, props) else 0
+    for row in repo.rows(S.DB_CONTEST_ENTRIES):
+        member = member_of(row, S.P_ContestEntries.MEMBER)
+        if member is not None:
+            who = member.name
+        elif get_select(row, S.P_ContestEntries.MODE) == "Team" and get_relation(row, S.P_ContestEntries.TEAM):
+            who = team_names.get(get_relation(row, S.P_ContestEntries.TEAM)[0])
+        else:
+            continue
+        if who:
+            changed += 1 if repo.sync(S.DB_CONTEST_ENTRIES, row, {S.P_ContestEntries.WHO: nt.p_select(who)}) else 0
+    for row in repo.rows(S.DB_GOALS):
+        member = member_of(row, S.P_Goals.MEMBER)
+        team_ids = get_relation(row, S.P_Goals.TEAM)
+        if member is not None:
+            who = member.name
+        elif get_select(row, S.P_Goals.SCOPE) == "Team" and team_ids:
+            who = team_names.get(team_ids[0])
+        else:
+            continue
+        if who:
+            changed += 1 if repo.sync(S.DB_GOALS, row, {S.P_Goals.WHO: nt.p_select(who)}) else 0
+    for db, prop, who_prop in (
+        (S.DB_LEARNING_QUEUE, S.P_LearningQueue.MEMBER, S.P_LearningQueue.WHO),
+        (S.DB_ACHIEVEMENTS, S.P_Achievements.MEMBER, S.P_Achievements.WHO),
+        (S.DB_RATING_HISTORY, S.P_RatingHistory.MEMBER, S.P_RatingHistory.WHO),
+    ):
+        for row in repo.rows(db):
+            member = member_of(row, prop)
+            if member is None:
+                continue
+            changed += 1 if repo.sync(db, row, {who_prop: nt.p_select(member.name)}) else 0
+    return changed
 
 
 def _sum_points(stats: dict[date, DayStat], start: date, end: date) -> float:

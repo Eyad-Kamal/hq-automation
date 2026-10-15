@@ -1,6 +1,7 @@
 """Command line entry point: ``python -m hq.main <job> [--force] [--dry-run] [--member NAME]``.
 
-Jobs: auto (default in CI), onboard, contests, alerts, imports, recompute, daily, weekly.
+Jobs: auto (default in CI), onboard, contests, alerts, imports, recompute, daily, weekly,
+backfill-weekly (Weekly Summary rows for the last WEEKLY_BACKFILL_WEEKS weeks; no reports or MVP).
 
 ``auto`` runs, in this order:
   onboard -> contests -> alerts -> [imports + recompute, when the last import is
@@ -45,6 +46,7 @@ JOBS: dict[str, Callable[[Context], JobResult]] = {
     "recompute": recompute.run,
     "daily": daily.run,
     "weekly": weekly.run,
+    "backfill-weekly": weekly.backfill_run,
 }
 ALIASES: dict[str, str] = {"import": "imports"}
 CHOICES = ("auto", *JOBS, *ALIASES)
@@ -84,6 +86,22 @@ class LiveSources:
 
     def cf_problemset(self):
         return codeforces.fetch_problemset(self.session) or []
+
+    def cf_problem_count(self, external_id):
+        """Problem count of a regular Codeforces contest ("CF-<id>"), from the problemset.
+        Gym contests ("GYM-<id>") get no lookup: they are not in the problemset. None when unknown."""
+        if not external_id.startswith("CF-") or not external_id[3:].isdigit():
+            return None
+        return codeforces.fetch_problem_counts(self.session).get(int(external_id[3:]))
+
+    def cf_contest(self, external_id):
+        """Real name, start and duration of a Codeforces ("CF-<id>") or gym ("GYM-<id>")
+        contest, or None when the contest list does not know it."""
+        gym = external_id.startswith("GYM-")
+        for contest in codeforces.fetch_all_contests(self.session, gym):
+            if contest.external_id == external_id:
+                return contest
+        return None
 
     def at_solves(self, user, since, offset, *, strict: bool = False):
         if strict:

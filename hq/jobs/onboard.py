@@ -11,6 +11,9 @@ For each active member:
 * Contest Subscriptions by level when empty. A member without a level gets L1.
 
 Only blank fields are filled. A value the coach set is never overwritten.
+
+Then, when DASHBOARDS_AUTO is 1, every active member without a Dashboard URL gets a
+personal dashboard page (see ``hq.jobs.dashboards``).
 """
 
 from __future__ import annotations
@@ -21,6 +24,7 @@ from hq import notion as nt
 from hq import schema as S
 from hq.config import num
 from hq.jobs import OK, WARNING, Context, JobResult
+from hq.jobs import dashboards as dashboards_mod
 from hq.repo import get_relation
 from hq.schema import ConfigKey as K
 
@@ -56,9 +60,11 @@ def run(ctx: Context) -> JobResult:
             log.exception("onboard failed for %s", member.name)
             failures.append(f"{member.name}: {type(exc).__name__}: {exc}")
 
+    dashboards = dashboards_mod.ensure_dashboards(ctx, members)
     details = [
         f"members checked: {len(members)}",
         f"learning queue rows created: {queue_rows}",
+        f"personal dashboards created: {dashboards}",
         *(f"FAILED {line}" for line in failures),
     ]
     result = WARNING if failures else OK

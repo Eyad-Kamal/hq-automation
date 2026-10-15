@@ -5,9 +5,9 @@
    older ones left behind by a missed run.
 2. Each active member gets today's Daily Log row (if missing) and one auto
    practice task "🎯 <topic>: <n> problems". The topic comes from the member's
-   learning queue: Learning/Practicing rows first (highest priority, then the
-   earliest deadline, then topic order), otherwise the first Queued core topic
-   of the member's level. Problems come from the Codeforces problemset, filtered
+   learning queue. If the member has any "Learning" row, only those rows are used
+   (highest priority, then the earliest deadline, then topic order); otherwise
+   Practicing rows, then the first Queued core topic of the member's level. Problems come from the Codeforces problemset, filtered
    by the topic's CF tags and rating band, excluding problems already solved.
    The pick is deterministic: seed = hash(member id, date). Source Key
    "auto:<date>:<member id>" makes the task unique per day.
@@ -27,11 +27,12 @@ from hq import config
 from hq import notion as nt
 from hq import schema as S
 from hq.config import num
-from hq.jobs import OK, WARNING, Context, JobResult, cairo_end_of_day
+from hq.jobs import OK, WARNING, Context, JobResult, cairo_end_of_day, cairo_midnight
 from hq.logic import autotasks
 from hq.jobs.recompute import ensure_daily_log
 from hq.repo import Member, Repo, Topic, cairo_day_of, get_date, get_number, get_relation, get_select, get_status, get_text, get_title, member_task_props
 from hq.schema import ConfigKey as K
+from hq.logic.problem_ref import norm_key
 from hq.timeutil import cairo_date
 
 log = logging.getLogger("hq.jobs.daily")
@@ -54,6 +55,7 @@ def run(ctx: Context) -> JobResult:
     topics = {t.id: t for t in repo.topics()}
     lq_rows = repo.rows(S.DB_LEARNING_QUEUE)
     skipped = _skip_overdue_practice(repo, today)
+    stale_upsolve = _expire_stale_upsolve_tasks(ctx)
     practice = upsolve = 0
     notes: list[str] = []
     failures: list[str] = []
@@ -76,12 +78,13 @@ def run(ctx: Context) -> JobResult:
         f"overdue practice tasks skipped: {skipped}",
         f"practice tasks created: {practice} for {len(members)} member(s)",
         f"upsolve reminders created: {upsolve}",
+        f"stale upsolve reminders skipped (contest ended before the window): {stale_upsolve}",
         *notes,
         *failures,
     ]
     # A member with no task (no topic, or no problems picked) or a failure is a Warning.
     result = WARNING if (notes or failures) else OK
-    return JobResult(job=JOB, result=result, items=practice + upsolve + skipped, details="\n".join(details))
+    return JobResult(job=JOB, result=result, items=practice + upsolve + skipped + stale_upsolve, details="\n".join(details))
 
 
 def _skip_overdue_practice(repo: Repo, today: date) -> int:
@@ -102,40 +105,56 @@ def _skip_overdue_practice(repo: Repo, today: date) -> int:
 def _candidate_topics(member: Member, lq_rows: list[dict], topics: dict[str, Topic]) -> list[Topic]:
     """Topics to practise, best first.
 
-    1. Learning / Practicing queue rows, by Priority, then Deadline, then topic Order.
-    2. Then the Queued core topics of the member's level, by Order.
+    * If the member has ANY queue row with Queue Status "Learning" (the topics the
+      member picked to study), only those rows are candidates, ordered by Priority,
+      then Deadline, then topic Order. A Learning row at Competent or higher is
+      skipped. Recompute never changes a Learning status.
+    * Otherwise (no Learning rows): Practicing rows first (same ordering), then the
+      Queued core topics of the member's level, by Order.
     A queue row whose tier (Coach Override, else Auto Tier) is Competent, Proficient or
     Master is skipped: that topic is done for now (F6).
     """
-    active: list[tuple[tuple[int, date, int], Topic]] = []
-    queued: list[tuple[int, Topic]] = []
+    own_rows: list[tuple[dict, Topic | None]] = []
     for row in lq_rows:
         if member.id not in get_relation(row, S.P_LearningQueue.MEMBER):
             continue
         topic_ids = get_relation(row, S.P_LearningQueue.TOPIC)
         topic = topics.get(topic_ids[0]) if topic_ids else None
+        own_rows.append((row, topic))
+    has_learning = any(get_status(row, S.P_LearningQueue.QUEUE_STATUS) == "Learning" for row, _ in own_rows)
+
+    active: list[tuple[tuple[int, date, int], Topic]] = []
+    queued: list[tuple[int, Topic]] = []
+    for row, topic in own_rows:
         if topic is None or not topic.has_band:
             continue
         tier = get_select(row, S.P_LearningQueue.COACH_OVERRIDE) or get_select(row, S.P_LearningQueue.AUTO_TIER)
         if tier in COMPETENT_OR_MORE:
             continue
         status = get_status(row, S.P_LearningQueue.QUEUE_STATUS)
-        if status in ("Learning", "Practicing"):
-            priority = PRIORITY_ORDER.get(get_select(row, S.P_LearningQueue.PRIORITY) or "", 3)
-            deadline = get_date(row, S.P_LearningQueue.DEADLINE)
-            if isinstance(deadline, datetime):
-                deadline = cairo_date(deadline)
-            active.append(((priority, deadline or date.max, topic.order), topic))
-        elif status == "Queued" and topic.core and topic.level_no == member.level_no:
-            queued.append((topic.order, topic))
+        if has_learning:
+            if status != "Learning":
+                continue
+        elif status == "Queued":
+            if topic.core and topic.level_no == member.level_no:
+                queued.append((topic.order, topic))
+            continue
+        elif status != "Practicing":
+            continue
+        priority = PRIORITY_ORDER.get(get_select(row, S.P_LearningQueue.PRIORITY) or "", 3)
+        deadline = get_date(row, S.P_LearningQueue.DEADLINE)
+        if isinstance(deadline, datetime):
+            deadline = cairo_date(deadline)
+        active.append(((priority, deadline or date.max, topic.order), topic))
     ordered = [t for _, t in sorted(active, key=lambda item: item[0])]
-    ordered += [t for _, t in sorted(queued, key=lambda item: item[0]) if t not in ordered]
+    if not has_learning:
+        ordered += [t for _, t in sorted(queued, key=lambda item: item[0]) if t not in ordered]
     return ordered
 
 
 def _solved_keys(repo: Repo, member: Member) -> set[str]:
     return {
-        get_text(p, S.P_Problems.PROBLEM_KEY)
+        norm_key(get_text(p, S.P_Problems.PROBLEM_KEY))
         for p in repo.rows(S.DB_PROBLEMS)
         if get_status(p, S.P_Problems.STATUS) == "Solved" and member.id in get_relation(p, S.P_Problems.MEMBER)
     }
@@ -211,29 +230,68 @@ def _upsolve_pct(entry: dict) -> int:
     return round(done / total * 100)
 
 
-def _contest_ended_before(ctx: Context, entry: dict, cutoff: datetime, today: date) -> bool:
-    """True when the entry's contest ended at or before ``cutoff``. Without a contest
-    time, the entry date must be before yesterday."""
-    contest = ctx.repo.by_id(S.DB_CONTESTS, (get_relation(entry, S.P_ContestEntries.CONTEST) or [None])[0])
+def _contest_end_of(contest: dict | None, entry: dict | None) -> datetime | None:
+    """When a contest ended (start + duration). Without a contest time, the end of the
+    entry's Cairo day (midnight after it), so a date-only entry still has a usable end.
+    None when neither is known."""
     if contest is not None:
         start = get_date(contest, S.P_Contests.START)
         duration = get_number(contest, S.P_Contests.DURATION_MIN)
         if isinstance(start, datetime) and duration is not None:
-            return start + timedelta(minutes=int(duration)) <= cutoff
+            return start + timedelta(minutes=int(duration))
+    if entry is None:
+        return None
     day = cairo_day_of(get_date(entry, S.P_ContestEntries.DATE))
-    return day is not None and day <= today - timedelta(days=1)
+    return cairo_midnight(day + timedelta(days=1)) if day is not None else None
+
+
+def _entry_contest(repo: Repo, entry: dict) -> dict | None:
+    return repo.by_id(S.DB_CONTESTS, (get_relation(entry, S.P_ContestEntries.CONTEST) or [None])[0])
+
+
+def _ended_in_window(ctx: Context, entry: dict, cutoff: datetime, window_start: datetime, today: date) -> bool:
+    """True when the entry's contest ended in [window_start, cutoff]. Without a contest
+    time the entry date must be yesterday or earlier and not older than the window."""
+    contest = _entry_contest(ctx.repo, entry)
+    if contest is not None and isinstance(get_date(contest, S.P_Contests.START), datetime):
+        end = _contest_end_of(contest, entry)
+        return end is not None and window_start <= end <= cutoff
+    day = cairo_day_of(get_date(entry, S.P_ContestEntries.DATE))
+    return day is not None and cairo_date(window_start) <= day <= today - timedelta(days=1)
+
+
+def _expire_stale_upsolve_tasks(ctx: Context) -> int:
+    """Open auto Upsolve tasks whose contest ended more than UPSOLVE_WINDOW_DAYS ago
+    become Skipped (cleans up reminders created before the window existed)."""
+    repo = ctx.repo
+    window = timedelta(days=num(ctx.cfg, K.UPSOLVE_WINDOW_DAYS))
+    expired = 0
+    for task in repo.rows(S.DB_TASKS):
+        if get_select(task, S.P_Tasks.TYPE) != "Upsolve" or get_select(task, S.P_Tasks.ORIGIN) != "Auto":
+            continue
+        if get_status(task, S.P_Tasks.STATUS) not in OPEN_PRACTICE_STATUSES:
+            continue
+        contest = repo.by_id(S.DB_CONTESTS, (get_relation(task, S.P_Tasks.CONTEST) or [None])[0])
+        entry = repo.by_id(S.DB_CONTEST_ENTRIES, (get_relation(task, S.P_Tasks.CONTEST_ENTRY) or [None])[0])
+        end = _contest_end_of(contest, entry)
+        if end is None or end >= ctx.now - window:
+            continue
+        repo.sync(S.DB_TASKS, task, {S.P_Tasks.STATUS: nt.p_status("Skipped")})
+        expired += 1
+    return expired
 
 
 def _create_upsolve_tasks(ctx: Context, member: Member, today: date) -> int:
     repo = ctx.repo
     cutoff = ctx.now - timedelta(days=1)
+    window_start = ctx.now - timedelta(days=num(ctx.cfg, K.UPSOLVE_WINDOW_DAYS))
     made = 0
     for entry in repo.rows(S.DB_CONTEST_ENTRIES):
         if member.id not in get_relation(entry, S.P_ContestEntries.MEMBER):
             continue
         if get_status(entry, S.P_ContestEntries.STATUS) not in UPSOLVE_ENTRY_STATUSES:
             continue
-        if not _contest_ended_before(ctx, entry, cutoff, today):
+        if not _ended_in_window(ctx, entry, cutoff, window_start, today):
             continue
         if _upsolve_pct(entry) >= 100:
             continue

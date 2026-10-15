@@ -45,14 +45,14 @@ def pick_problems(
     if n <= 0:
         return []
 
-    solved = set(solved_keys)
+    solved = {str(k).strip().lower() for k in solved_keys}  # case-insensitive, like the Problems match
     wanted_tags = _norm_tags(tags)
     pool = [dict(p) for p in problemset]
 
     def candidates_for(low: int, high: int) -> list[dict[str, Any]]:
         found = []
         for p in pool:
-            if p.get("key") in solved:
+            if str(p.get("key", "")).strip().lower() in solved:
                 continue
             rating = p.get("rating")
             if rating is None or not (low <= rating <= high):

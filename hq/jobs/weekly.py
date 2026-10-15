@@ -27,14 +27,16 @@ Team and club summaries, the report and the MVP are only produced on full runs
 from __future__ import annotations
 
 import logging
-from collections import defaultdict
+from collections import Counter, defaultdict
 from datetime import date, datetime, time, timedelta
 from typing import Any
 
 from hq import config
 from hq import notion as nt
 from hq import schema as S
+from hq.config import num
 from hq.jobs import OK, Context, JobResult
+from hq.jobs import recompute
 from hq.logic import weekly
 from hq.notify import comment_rich_text
 from hq.repo import (
@@ -154,14 +156,119 @@ def run(ctx: Context) -> JobResult:
             report_id=report["id"] if report else None,
         )
 
+    history_rows = 0
+    if full_run:
+        # Older weeks: only missing rows are created and changed values written (no report, no MVP).
+        history_rows = backfill_history(ctx, range(2, int(num(ctx.cfg, K.WEEKLY_BACKFILL_WEEKS)) + 1))
     config.set_state(repo, config.STATE_LAST_WEEKLY, saturday.isoformat())
     items = repo.writes - writes_before
     details = [
         f"week {label}: {len(scope)} member summar{'y' if len(scope) == 1 else 'ies'}",
         f"report: {'created' if created_report else ('exists' if report else 'not written (partial run)')}",
         f"MVP: {mvp_member.name if mvp_member else 'none'}",
+        f"history weeks: {history_rows} older summary row(s) written",
     ]
     return JobResult(job=JOB, result=OK, items=items, details="\n".join(details))
+
+
+def backfill_run(ctx: Context) -> JobResult:
+    """CLI ``backfill-weekly``: fill Weekly Summary rows for the last WEEKLY_BACKFILL_WEEKS
+    complete weeks (the latest one included). No Weekly Reports pages and no MVP awards."""
+    writes_before = ctx.repo.writes
+    weeks = max(1, int(num(ctx.cfg, K.WEEKLY_BACKFILL_WEEKS)))
+    written = backfill_history(ctx, range(1, weeks + 1))
+    details = [f"weeks checked: {weeks}", f"summary rows written: {written}"]
+    return JobResult(job=JOB, result=OK, items=ctx.repo.writes - writes_before, details="\n".join(details))
+
+
+def _computed_daily_index(ctx: Context) -> dict[tuple[str, date], dict[str, Any]]:
+    """Per member and Cairo day, the same row shape as ``_daily_index``, computed from the
+    Problems and Contest Entries rows. Used for older weeks, which have no Daily Log rows."""
+    repo = ctx.repo
+    index: dict[tuple[str, date], dict[str, Any]] = {}
+    duplicates: list[str] = []
+    for member in [m for m in repo.members() if m.active]:
+        ref = recompute.member_ref_rating(repo, member)
+        solved = recompute._member_problems(repo, member, ref, ctx.cfg, duplicates)
+        entries = recompute._attended_entries(repo, member, duplicates)
+        contest_days = Counter(cairo_day_of(get_date(e, S.P_ContestEntries.DATE)) for e in entries)
+        for day, stat in recompute._day_stats(solved, contest_days).items():
+            index[(member.id, day)] = {
+                "date": day,
+                "problems": stat.problems,
+                "points": round(stat.points, 2),
+                "contests": stat.contests,
+                "max_rating": stat.max_rating or None,
+                "active": stat.problems > 0 or stat.contests > 0,
+            }
+    return index
+
+
+def backfill_history(ctx: Context, week_offsets: range) -> int:
+    """Person, Team and Club Weekly Summary rows for the weeks ``saturday - 7*k`` (k in
+    ``week_offsets``). Creates missing rows and updates changed values only. Existing rows
+    keep their MVP tick and Report link. Returns the number of rows written."""
+    repo = ctx.repo
+    saturday = week_start(ctx.today)
+    writes_before = repo.writes
+    index = _computed_daily_index(ctx)
+    members = [m for m in repo.members() if m.active]
+    for k in week_offsets:
+        week_begin = saturday - timedelta(days=7 * k)
+        prev_begin = week_begin - timedelta(days=7)
+        week_days = [week_begin + timedelta(days=i) for i in range(7)]
+        prev_days = [prev_begin + timedelta(days=i) for i in range(7)]
+        label = week_label(week_begin)
+        rating_delta, topics_per_member = _week_extras(repo, week_begin, week_begin + timedelta(days=7))
+        person_rows = {m.id: [index[(m.id, d)] for d in week_days if (m.id, d) in index] for m in members}
+        person_prev = {m.id: sum(index[(m.id, d)]["points"] for d in prev_days if (m.id, d) in index) for m in members}
+        for m in members:
+            summary = weekly.summarize(person_rows[m.id], person_prev[m.id])
+            summary["rating_delta"] = rating_delta.get(m.id, 0)
+            summary["topics_advanced"] = len(topics_per_member.get(m.id, set()))
+            _upsert_history_summary(
+                repo, m.name, "Person", m.name, week_begin, label, summary,
+                key=f"person:{m.id}:{week_begin.isoformat()}", member_id=m.id,
+            )
+        for team, summary in _team_summaries(repo, members, person_rows, person_prev, rating_delta, topics_per_member):
+            _upsert_history_summary(
+                repo, team["name"], "Team", team["name"], week_begin, label, summary,
+                key=f"team:{team['id']}:{week_begin.isoformat()}", team_id=team["id"],
+            )
+        club_rows = _aggregate([row for rows in person_rows.values() for row in rows])
+        club = weekly.summarize(club_rows, sum(person_prev.values()))
+        club["rating_delta"] = sum(rating_delta.values())
+        club["topics_advanced"] = len(set().union(*topics_per_member.values())) if topics_per_member else 0
+        _upsert_history_summary(
+            repo, "Club", "Club", "Club", week_begin, label, club,
+            key=f"club:club:{week_begin.isoformat()}",
+        )
+    return repo.writes - writes_before
+
+
+def _upsert_history_summary(
+    repo: Repo,
+    name: str,
+    scope: str,
+    who: str,
+    week_begin: date,
+    label: str,
+    summary: dict[str, Any],
+    *,
+    key: str,
+    member_id: str | None = None,
+    team_id: str | None = None,
+) -> None:
+    """Upsert a summary for a backfilled week, keeping the MVP tick and Report link that
+    an existing row already has."""
+    existing = repo.find(S.DB_WEEKLY_SUMMARY, S.P_WeeklySummary.SOURCE_KEY, key)
+    mvp = get_checkbox(existing, S.P_WeeklySummary.MVP) if existing is not None else False
+    report_ids = get_relation(existing, S.P_WeeklySummary.REPORT) if existing is not None else []
+    _upsert_summary(
+        repo, name, scope, who, week_begin, label, summary,
+        key=key, member_id=member_id, team_id=team_id, mvp=mvp,
+        report_id=report_ids[0] if report_ids else None,
+    )
 
 
 def _daily_index(repo: Repo) -> dict[tuple[str, date], dict[str, Any]]:

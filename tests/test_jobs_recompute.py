@@ -59,7 +59,7 @@ def test_daily_log_rows_for_the_window_plus_today() -> None:
     w = _setup()
     _chain(w)
     eyad_rows = [r for r in w.notion.rows(S.DB_DAILY_LOG) if get_relation(r, S.P_DailyLog.MEMBER) == [w.eyad]]
-    assert len(eyad_rows) == 15, "14 days before today plus today"
+    assert len(eyad_rows) == 61, "DAILY_LOG_DAYS default 60 days before today, plus today"
 
     oct13 = _daily(w, DAY_OCT13)
     assert get_number(oct13, S.P_DailyLog.PROBLEMS) == 1

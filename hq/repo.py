@@ -458,6 +458,29 @@ class Repo:
         self.sync(db, page, properties)
         return page, False
 
+    def create_child_page(self, parent_page_id: str, title: str, children: list[Json] | None = None) -> Json:
+        """Create a page under ``parent_page_id`` (dry-run aware). Returns the page (with url)."""
+        self.writes += 1
+        if self.dry_run:
+            self._seq += 1
+            self._record(f"create page under {parent_page_id}: {title}")
+            return {"id": f"dry-run-page-{self._seq}", "url": ""}
+        resp = self.notion.create_child_page(parent_page_id, title, children)
+        return {"id": resp["id"], "url": resp.get("url", "")}
+
+    def create_view(self, body: Json) -> Json:
+        """Create a database view (dry-run aware)."""
+        self.writes += 1
+        if self.dry_run:
+            self._record(f"create view {body.get('name')}: {body.get('type')}")
+            return {}
+        return self.notion.create_view(body)
+
+    def data_source_properties(self, db: str) -> dict[str, dict]:
+        """Property name -> {"id", "type"} of a database's data source (read; also in dry-run)."""
+        resp = self.notion.retrieve_data_source(self.ds(db))
+        return dict(resp.get("properties") or {})
+
     def comment(self, page_id: str, rich_text: list[Json]) -> Json:
         self.writes += 1
         if self.dry_run:

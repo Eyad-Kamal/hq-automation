@@ -34,7 +34,7 @@ ERROR = "Error"
 SKIPPED = "Skipped"
 
 # Sync Log "Job" select options differ from the CLI job names in one place.
-LOG_JOB_NAMES: dict[str, str] = {"imports": "import"}
+LOG_JOB_NAMES: dict[str, str] = {"imports": "import", "backfill-weekly": "weekly"}
 MAX_DETAILS = 1900
 
 

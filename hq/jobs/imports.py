@@ -41,6 +41,7 @@ others still run.
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
@@ -52,17 +53,20 @@ from hq.config import num
 from hq.jobs import ERROR, OK, WARNING, Context, JobResult, cairo_midnight
 from hq.jobs.recompute import member_ref_rating
 from hq.logic import contest_kind, scoring, topic_map
+from hq.logic.problem_ref import identities
 from hq.models import RatingChange, Solve
 from hq.repo import (
     Member,
     Repo,
     get_checkbox,
     get_date,
+    get_number,
     get_relation,
     get_select,
     get_status,
     get_text,
     get_title,
+    get_url,
     is_blank,
 )
 from hq.schema import ConfigKey as K
@@ -70,6 +74,7 @@ from hq.schema import Judge, Mode
 from hq.timeutil import cairo_date
 
 log = logging.getLogger("hq.jobs.imports")
+PLACEHOLDER_CONTEST = re.compile(r"^(Codeforces|CF Gym) contest \d+$")
 
 JOB = "imports"
 DUE_AFTER = timedelta(minutes=25)
@@ -175,6 +180,7 @@ def _cf_user_info(ctx: Context, handles: list[str]) -> tuple[dict[str, dict], li
 def run(ctx: Context) -> JobResult:
     repo = ctx.repo
     cfg = ctx.cfg
+    renamed = _rename_placeholder_contests(ctx)
     backfill = int(num(cfg, K.IMPORT_BACKFILL_DAYS))
     offset = int(num(cfg, K.ATCODER_OFFSET))
     members = [m for m in ctx.active_members() if m.has_handles]
@@ -197,11 +203,14 @@ def run(ctx: Context) -> JobResult:
             log.exception("import failed for %s", member.name)
             stats.errors.append(f"{member.name}: {type(exc).__name__}: {exc}")
 
+    totals = _fill_total_problems(ctx)
     config.set_state(repo, config.STATE_LAST_IMPORT, ctx.now.isoformat())
 
-    items = stats.problems_created + stats.problems_updated + stats.entries_created + stats.ratings_created
+    items = stats.problems_created + stats.problems_updated + stats.entries_created + stats.ratings_created + renamed + totals
     details = [
         f"members imported cleanly: {stats.members_ok}/{len(members)}",
+        f"placeholder contests renamed: {renamed}",
+        f"contest Total Problems filled: {totals}",
         f"problems: {stats.problems_created} new, {stats.problems_updated} filled",
         f"contest entries: {stats.entries_created} new (contests created: {stats.contests_created})",
         f"rating rows: {stats.ratings_created} new",
@@ -413,6 +422,14 @@ def _upsert_problem(
     key = f"{solve.problem_key}:{member.id}"
     page = repo.find(S.DB_PROBLEMS, S.P_Problems.SOURCE_KEY, key)
     if page is None:
+        manual = _manual_match(repo, member, solve)
+        if manual is not None:
+            # A row the member or a coach typed for the same problem: adopt it, fill only blanks.
+            changes = _adopt_changes(manual, props)
+            if changes:
+                stats.problems_updated += 1
+                repo.update(S.DB_PROBLEMS, manual, changes)
+            return manual
         created = _create(ctx, stats, S.DB_PROBLEMS, props, outcome)
         if created is not None:
             stats.problems_created += 1
@@ -422,6 +439,42 @@ def _upsert_problem(
         stats.problems_updated += 1
         repo.update(S.DB_PROBLEMS, page, changes)
     return page
+
+
+def _manual_match(repo: Repo, member: Member, solve: Solve) -> dict | None:
+    """A Problems row of this member, not yet linked to a Source Key, whose Problem Key or
+    Link names the same problem as the solve (case, trailing slash, scheme and the CF
+    problemset/contest forms are ignored)."""
+    wanted = identities(solve.problem_key, solve.link)
+    if not wanted:
+        return None
+    for row in repo.rows(S.DB_PROBLEMS):
+        if member.id not in get_relation(row, S.P_Problems.MEMBER):
+            continue
+        if get_text(row, S.P_Problems.SOURCE_KEY).strip():
+            continue  # already an imported row (of this or another key)
+        if identities(get_text(row, S.P_Problems.PROBLEM_KEY), get_url(row, S.P_Problems.LINK)) & wanted:
+            return row
+    return None
+
+
+def _adopt_changes(page: dict, props: dict[str, Any]) -> dict[str, Any]:
+    """Fill-only changes that link an adopted manual row to the import: every property
+    that is empty on the row gets the imported value. Imported stays unticked, and a value
+    the user entered is never overwritten. Status is the exception: an accepted solve sets it
+    to Solved."""
+    current = page.get("properties") or {}
+    changes = {
+        name: value
+        for name, value in props.items()
+        if name not in (S.P_Problems.IMPORTED, S.P_Problems.STATUS)
+        and is_blank(current.get(name))
+        and not is_blank(value)
+    }
+    # An accepted submission is a fact: Status becomes Solved even when the row said otherwise.
+    if get_status(page, S.P_Problems.STATUS) != _STATUS_SOLVED:
+        changes[S.P_Problems.STATUS] = nt.p_status(_STATUS_SOLVED)
+    return changes
 
 
 def _problem_changes(page: dict, props: dict[str, Any], mode: str) -> dict[str, Any]:
@@ -483,19 +536,78 @@ def _ensure_contest(
     platform, prefix = _platform_of(external_id)
     number = external_id.split("-", 1)[1] if "-" in external_id else external_id
     name = f"{prefix} {number}"
+    start = min(s.solved_at_utc for s in solves)
+    real = ctx.sources.cf_contest(external_id) if external_id.startswith(("CF-", "GYM-")) else None
+    if real is not None:  # the real name, start and duration from contest.list (not a placeholder)
+        name, start, platform = real.name, real.start_utc, real.platform
     props = {
         S.P_Contests.TITLE: nt.p_title(name),
         S.P_Contests.PLATFORM: nt.p_select(platform),
         S.P_Contests.KIND: nt.p_select(contest_kind.classify(platform, name)),
-        S.P_Contests.START: nt.p_date(min(s.solved_at_utc for s in solves)),
+        S.P_Contests.START: nt.p_date(start),
         S.P_Contests.PHASE: nt.p_select("Finished"),
         S.P_Contests.RATED: nt.p_checkbox(any(s.mode == Mode.LIVE for s in solves)),
         S.P_Contests.EXTERNAL_ID: nt.p_text(external_id),
         S.P_Contests.TASKS_CREATED: nt.p_checkbox(True),
         S.P_Contests.ALERT_SENT: nt.p_checkbox(True),
     }
+    if real is not None:
+        props[S.P_Contests.DURATION_MIN] = nt.p_number(real.duration_min)
     created = _create(ctx, stats, S.DB_CONTESTS, props, outcome)
     return created, created is not None
+
+
+def _fill_total_problems(ctx: Context) -> int:
+    """Fill an empty Total Problems on regular Codeforces Contest Entries from the problemset
+    (problems per contest id). Fill-only. Gym contests are left empty (no lookup). Returns
+    the number of entries filled."""
+    repo = ctx.repo
+    filled = 0
+    for entry in repo.rows(S.DB_CONTEST_ENTRIES):
+        if get_number(entry, S.P_ContestEntries.TOTAL_PROBLEMS):
+            continue
+        contest = repo.by_id(S.DB_CONTESTS, (get_relation(entry, S.P_ContestEntries.CONTEST) or [None])[0])
+        if contest is None or get_select(contest, S.P_Contests.PLATFORM) != "Codeforces":
+            continue
+        count = ctx.sources.cf_problem_count(get_text(contest, S.P_Contests.EXTERNAL_ID))
+        if count:
+            repo.sync(S.DB_CONTEST_ENTRIES, entry, {S.P_ContestEntries.TOTAL_PROBLEMS: nt.p_number(count)}, fill_only=True)
+            filled += 1
+    return filled
+
+
+def _rename_placeholder_contests(ctx: Context) -> int:
+    """Contests rows still named "Codeforces contest <id>" or "CF Gym contest <id>" get the
+    real name, start, duration and Kind; their Contest Entry titles become
+    "<contest name> · <member>". Returns the number of contests renamed."""
+    repo = ctx.repo
+    renamed = 0
+    for contest in repo.rows(S.DB_CONTESTS):
+        name = get_title(contest, S.P_Contests.TITLE)
+        external_id = get_text(contest, S.P_Contests.EXTERNAL_ID)
+        if not PLACEHOLDER_CONTEST.match(name) or not external_id.startswith(("CF-", "GYM-")):
+            continue
+        real = ctx.sources.cf_contest(external_id)
+        if real is None or real.name == name:
+            continue
+        repo.sync(
+            S.DB_CONTESTS,
+            contest,
+            {
+                S.P_Contests.TITLE: nt.p_title(real.name),
+                S.P_Contests.START: nt.p_date(real.start_utc),
+                S.P_Contests.DURATION_MIN: nt.p_number(real.duration_min),
+                S.P_Contests.KIND: nt.p_select(contest_kind.classify(real.platform, real.name)),
+            },
+        )
+        renamed += 1
+        for entry in repo.rows(S.DB_CONTEST_ENTRIES):
+            if contest["id"] not in get_relation(entry, S.P_ContestEntries.CONTEST):
+                continue
+            who = get_select(entry, S.P_ContestEntries.WHO)
+            if who:
+                repo.sync(S.DB_CONTEST_ENTRIES, entry, {S.P_ContestEntries.TITLE: nt.p_title(f"{real.name} · {who}")})
+    return renamed
 
 
 def _ensure_entry(

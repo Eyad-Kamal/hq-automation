@@ -12,6 +12,7 @@ full history. Results are then filtered to ``solved_at_utc >= since_utc``.
 from __future__ import annotations
 
 import logging
+import weakref
 from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Any
@@ -70,6 +71,41 @@ def fetch_upcoming_contests(session: requests.Session) -> list[Contest]:
                 link=f"https://codeforces.com/contests/{cid}",
             )
         )
+    return contests
+
+
+# All contests (every phase) of the regular or the gym list, cached per session so one run
+# asks Codeforces once per list. A failed call is not cached.
+_contest_cache: "weakref.WeakKeyDictionary[requests.Session, dict[bool, list[Contest]]]" = weakref.WeakKeyDictionary()
+
+
+@guarded(list)
+def fetch_all_contests(session: requests.Session, gym: bool) -> list[Contest]:
+    """Every contest of the regular (gym=False) or gym (gym=True) list, in any phase.
+    external_id is "CF-<id>" or "GYM-<id>"; used to replace placeholder contest names."""
+    cache = _contest_cache.setdefault(session, {})
+    if gym in cache:
+        return cache[gym]
+    rows = _cf(session, "contest.list", {"gym": "true" if gym else "false"})
+    if not isinstance(rows, list):
+        return []
+    prefix = "GYM" if gym else "CF"
+    contests: list[Contest] = []
+    for row in rows:
+        if row.get("startTimeSeconds") is None or row.get("id") is None or not row.get("name"):
+            continue
+        cid = row["id"]
+        contests.append(
+            Contest(
+                platform=Platform.CF_GYM if gym else Platform.CODEFORCES,
+                external_id=f"{prefix}-{cid}",
+                name=row["name"],
+                start_utc=from_epoch(row["startTimeSeconds"]),
+                duration_min=int(row.get("durationSeconds") or 0) // 60,
+                link=f"https://codeforces.com/gym/{cid}" if gym else f"https://codeforces.com/contests/{cid}",
+            )
+        )
+    cache[gym] = contests
     return contests
 
 
@@ -231,11 +267,42 @@ def fetch_user_info(session: requests.Session, handles: list[str]) -> dict[str, 
     return fetch_user_info_or_none(session, handles) or {}
 
 
+# problemset.problems is one large response: fetched once per session and shared by
+# fetch_problemset (autotasks) and fetch_problem_counts (Total Problems).
+_problemset_cache: "weakref.WeakKeyDictionary[requests.Session, dict]" = weakref.WeakKeyDictionary()
+
+
+def _problemset_result(session: requests.Session) -> dict | None:
+    if session in _problemset_cache:
+        return _problemset_cache[session]
+    result = _cf(session, "problemset.problems")
+    if not isinstance(result, dict):
+        return None
+    _problemset_cache[session] = result
+    return result
+
+
+@guarded(dict)
+def fetch_problem_counts(session: requests.Session) -> dict[int, int]:
+    """Number of problems per regular contest id (from problemset.problems). Gym contests are
+    not in the problemset and are not counted. {} when the call fails (not cached then)."""
+    result = _problemset_result(session)
+    if result is None:
+        return {}
+    counts: dict[int, int] = {}
+    for prob in result.get("problems", []):
+        cid = prob.get("contestId")
+        if cid is None or prob.get("index") is None:
+            continue
+        counts[int(cid)] = counts.get(int(cid), 0) + 1
+    return counts
+
+
 @guarded(list)
 def fetch_problemset(session: requests.Session) -> list[dict]:
     """All problems in the public problemset (no gym)."""
-    result = _cf(session, "problemset.problems")
-    if not isinstance(result, dict):
+    result = _problemset_result(session)
+    if result is None:
         return []
     items: list[dict] = []
     for prob in result.get("problems", []):

@@ -39,6 +39,9 @@ class FakeNotion:
         self.queries = 0
         self.create_faults: list[str] = []  # "fail" | "commit_then_fail", consumed per create
         self.query_log: list[str] = []
+        self.child_pages: list[tuple[str, str, list[dict[str, Any]]]] = []
+        self.views: list[dict[str, Any]] = []
+        self.view_faults: set[str] = set()  # view types the fake rejects with HTTP 400
         self._n = 0
 
     # -- Notion client surface ------------------------------------------------
@@ -91,7 +94,30 @@ class FakeNotion:
         return {"id": f"comment-{len(self.comments)}"}
 
     def retrieve_data_source(self, ds_id: str) -> dict[str, Any]:
-        return {"id": ds_id}
+        # Property ids are the name with a prefix; enough for the dashboard code under test.
+        names: set[str] = set()
+        for row in self.tables.get(ds_id, []):
+            names.update(row.get("properties", {}).keys())
+        return {"id": ds_id, "properties": {n: {"id": f"id-{n}", "type": "x"} for n in sorted(names)}}
+
+    def create_child_page(self, parent_page_id: str, title: str, children: Any = None) -> dict[str, Any]:
+        self._n += 1
+        page_id = f"page-{self._n:05d}"
+        self.child_pages.append((parent_page_id, title, copy.deepcopy(list(children or []))))
+        if children:
+            self.blocks.setdefault(page_id, []).extend(copy.deepcopy(list(children)))
+        return {"id": page_id, "url": f"https://www.notion.so/{page_id}"}
+
+    def create_view(self, body: dict[str, Any]) -> dict[str, Any]:
+        if "*" in self.view_faults:
+            from hq.notion import NotionError as _NE
+
+            raise _NE("POST /views -> HTTP 500 (injected)")
+        if self.view_faults and body.get("type") in self.view_faults:
+            from hq.notion import NotionError as _NE
+            raise _NE("POST /views -> HTTP 400 (injected)")
+        self.views.append(copy.deepcopy(body))
+        return {"id": f"view-{len(self.views)}"}
 
     # -- test helpers -----------------------------------------------------------
     def page(self, page_id: str) -> dict[str, Any] | None:
@@ -131,6 +157,9 @@ class FakeSources:
     problemset: list[dict[str, Any]] = field(default_factory=list)
     calls: list[str] = field(default_factory=list)
     failing: set[str] = field(default_factory=set)  # handles whose calls "fail"
+    contests: dict[str, Contest] = field(default_factory=dict)  # external id -> real contest (contest.list)
+    problem_counts: dict[int, int] = field(default_factory=dict)  # regular contest id -> problem count
+    count_calls: list[str] = field(default_factory=list)
 
     def _fails(self, handle: str, strict: bool) -> bool:
         return handle in self.failing
@@ -159,6 +188,16 @@ class FakeSources:
     def cf_problemset(self) -> list[dict[str, Any]]:
         self.calls.append("problemset")
         return list(self.problemset)
+
+    def cf_contest(self, external_id: str) -> Contest | None:
+        self.calls.append(f"cf_contest:{external_id}")
+        return self.contests.get(external_id)
+
+    def cf_problem_count(self, external_id: str) -> int | None:
+        if not external_id.startswith("CF-") or not external_id[3:].isdigit():
+            return None  # gym: no lookup
+        self.count_calls.append(external_id)
+        return self.problem_counts.get(int(external_id[3:]))
 
     def at_solves(self, user: str, since: datetime, offset: int, *, strict: bool = False) -> list[Solve] | None:
         if self._fails(user, strict):
