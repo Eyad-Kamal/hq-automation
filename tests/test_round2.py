@@ -558,6 +558,7 @@ def test_recompute_counts_one_solve_for_rows_that_name_the_same_problem_and_warn
 def test_7_onboard_creates_one_dashboard_per_active_member_with_filtered_views() -> None:
     w = build_world()
     onboard.run(w.context())
+    dashboards.run(w.context())  # round 3: dashboards are a job of their own, run after recompute and daily
     dashboard_pages = [p for p in w.notion.child_pages if p[0] == dashboards.DASHBOARD_PARENT_PAGE_ID]
     titles = sorted(t for _, t, _ in dashboard_pages)
     assert titles == ["👤 Eyad · Dashboard", "👤 Sara · Dashboard"], "inactive members get none"
@@ -573,8 +574,10 @@ def test_7_onboard_creates_one_dashboard_per_active_member_with_filtered_views()
 def test_7_second_onboard_does_not_create_another_dashboard() -> None:
     w = build_world()
     onboard.run(w.context())
+    dashboards.run(w.context())
     before = len(w.notion.child_pages)
     onboard.run(w.context())
+    dashboards.run(w.context())
     assert len(w.notion.child_pages) == before
 
 
@@ -589,6 +592,7 @@ def test_7_rejected_chart_or_board_becomes_a_table_with_a_warning() -> None:
     w = build_world()
     w.notion.view_faults = {"chart", "board"}
     onboard.run(w.context())
+    dashboards.run(w.context())
     board_or_chart = [v for v in w.notion.views if v["name"] in ("Learning Queue", "Daily points")]
     assert board_or_chart
     assert all(v["type"] == "table" for v in board_or_chart)
@@ -598,10 +602,12 @@ def test_7_view_server_error_still_stores_the_url_and_no_duplicate_page_is_creat
     w = build_world()
     w.notion.view_faults = {"*"}  # every view create fails with HTTP 500
     onboard.run(w.context())
+    dashboards.run(w.context())
     eyad_pages = [p for p in w.notion.child_pages if p[1] == "👤 Eyad · Dashboard"]
     assert len(eyad_pages) == 1
     assert get_url(w.notion.page(w.eyad), S.P_Members.DASHBOARD), "the URL is written before the views"
     onboard.run(w.context())
+    dashboards.run(w.context())
     assert len([p for p in w.notion.child_pages if p[1] == "👤 Eyad · Dashboard"]) == 1, "no duplicate dashboard"
 
 

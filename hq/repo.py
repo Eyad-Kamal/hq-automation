@@ -431,6 +431,10 @@ class Repo:
         for slot in [s for s in self._index if s[0] == db]:
             del self._index[slot]
 
+    def block_children(self, block_id: str) -> list[Json]:
+        """The first 100 child blocks of a page (a read; also in dry-run)."""
+        return self.notion.block_children(block_id, page_size=100)
+
     def has_children(self, page_id: str) -> bool:
         """Whether a page has at least one child block (a read; also in dry-run)."""
         return bool(self.notion.block_children(page_id, page_size=1))

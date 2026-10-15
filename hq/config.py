@@ -24,7 +24,8 @@ log = logging.getLogger("hq.config")
 STATE_LAST_IMPORT = "STATE_LAST_IMPORT"
 STATE_LAST_DAILY = "STATE_LAST_DAILY"
 STATE_LAST_WEEKLY = "STATE_LAST_WEEKLY"
-STATE_KEYS: tuple[str, ...] = (STATE_LAST_IMPORT, STATE_LAST_DAILY, STATE_LAST_WEEKLY)
+STATE_LAST_DASHBOARD_REPAIR = "STATE_LAST_DASHBOARD_REPAIR"  # Cairo day of the last dashboard view repair pass
+STATE_KEYS: tuple[str, ...] = (STATE_LAST_IMPORT, STATE_LAST_DAILY, STATE_LAST_WEEKLY, STATE_LAST_DASHBOARD_REPAIR)
 STATE_DESCRIPTION = "Automation state written by the jobs. Do not edit by hand."
 
 DEFAULTS: dict[str, Any] = {

@@ -70,7 +70,7 @@ class FakeNotion:
         return copy.deepcopy(page)
 
     def block_children(self, block_id: str, page_size: int = 100) -> list[dict[str, Any]]:
-        return [{"id": f"{block_id}-b{i}"} for i in range(len(self.blocks.get(block_id, [])))][:page_size]
+        return [{"id": f"{block_id}-b{i}", **copy.deepcopy(b)} for i, b in enumerate(self.blocks.get(block_id, []))][:page_size]
 
     def update_page(self, page_id: str, properties: dict[str, Any] | None = None, *, icon: Any = None) -> dict[str, Any]:
         page = self.page(page_id)
@@ -108,12 +108,12 @@ class FakeNotion:
 
     def create_child_page(self, parent_page_id: str, title: str, children: Any = None, icon: Any = None) -> dict[str, Any]:
         self._n += 1
-        page_id = f"page-{self._n:05d}"
+        page_id = f"{self._n:032x}"  # real page ids are 32 hex digits; the dashboard URL carries one
         self.child_pages.append((parent_page_id, title, copy.deepcopy(list(children or []))))
         self.child_icons.append(copy.deepcopy(icon))
         if children:
             self.blocks.setdefault(page_id, []).extend(copy.deepcopy(list(children)))
-        return {"id": page_id, "url": f"https://www.notion.so/{page_id}"}
+        return {"id": page_id, "url": f"https://www.notion.so/Dashboard-{page_id}"}
 
     def create_view(self, body: dict[str, Any]) -> dict[str, Any]:
         if "*" in self.view_faults:

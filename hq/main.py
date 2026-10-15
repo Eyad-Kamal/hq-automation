@@ -32,7 +32,7 @@ import requests
 
 from hq import config, notify
 from hq.jobs import ERROR, Context, JobResult, execute
-from hq.jobs import alerts, contests, daily, imports, onboard, recompute, weekly
+from hq.jobs import alerts, contests, daily, dashboards, imports, onboard, recompute, weekly
 from hq.notion import Notion, load_data_source_ids
 from hq.repo import Repo
 from hq.sources import atcoder, codeforces, leetcode
@@ -47,6 +47,7 @@ JOBS: dict[str, Callable[[Context], JobResult]] = {
     "daily": daily.run,
     "weekly": weekly.run,
     "backfill-weekly": weekly.backfill_run,
+    "dashboards": dashboards.run,
 }
 ALIASES: dict[str, str] = {"import": "imports"}
 CHOICES = ("auto", *JOBS, *ALIASES)
@@ -159,11 +160,16 @@ def run_auto(ctx: Context) -> list[JobResult]:
     results = [execute(ctx, "onboard", onboard.run)]
     results.append(execute(ctx, "contests", contests.run))
     results.append(execute(ctx, "alerts", alerts.run))
+    recomputed = False
     if ctx.force or imports.imports_due(ctx):
         results.append(execute(ctx, "imports", imports.run))
         results.append(execute(ctx, "recompute", recompute.run))
+        recomputed = True
     if ctx.force or daily.daily_due(ctx):
         results.append(execute(ctx, "daily", daily.run))
+    # After recompute and daily: the dashboard views filter on Who, and Notion lists a name as a
+    # Who option only once a job has written it.
+    results.append(execute(ctx, "dashboards", lambda c: dashboards.run(c, repair_now=recomputed)))
     if ctx.force or weekly.weekly_due(ctx):
         results.append(execute(ctx, "weekly", weekly.run))
     return results

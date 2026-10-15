@@ -112,10 +112,10 @@ def test_auto_runs_jobs_in_order_and_respects_due_checks() -> None:
     w = build_world()
     config.set_state(w.context().repo, config.STATE_LAST_WEEKLY, "2026-10-10")  # weekly not due this week
     first = [r.job for r in cli.run_auto(w.context(now=NOW))]
-    assert first == ["onboard", "contests", "alerts", "imports", "recompute", "daily"]
+    assert first == ["onboard", "contests", "alerts", "imports", "recompute", "daily", "dashboards"]
 
     second = [r.job for r in cli.run_auto(w.context(now=NOW + timedelta(minutes=5)))]
-    assert second == ["onboard", "contests", "alerts"], "imports (25 min guard) and daily (once a day) are not due"
+    assert second == ["onboard", "contests", "alerts", "dashboards"], "imports (25 min guard) and daily (once a day) are not due"
 
 
 def test_auto_runs_weekly_after_saturday() -> None:

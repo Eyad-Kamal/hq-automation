@@ -25,7 +25,6 @@ from hq import notion as nt
 from hq import schema as S
 from hq.config import num
 from hq.jobs import OK, WARNING, Context, JobResult
-from hq.jobs import dashboards as dashboards_mod
 from hq.repo import get_relation
 from hq.schema import ConfigKey as K
 
@@ -61,7 +60,6 @@ def run(ctx: Context) -> JobResult:
             log.exception("onboard failed for %s", member.name)
             failures.append(f"{member.name}: {type(exc).__name__}: {exc}")
 
-    dashboards = dashboards_mod.ensure_dashboards(ctx, members)
     # Row icons (ICON_BACKFILL_PER_RUN rows per run). Icon writes are not counted as items, so a
     # quiet run with only icon work writes no Sync Log row.
     icon_writes = 0
@@ -73,7 +71,6 @@ def run(ctx: Context) -> JobResult:
     details = [
         f"members checked: {len(members)}",
         f"learning queue rows created: {queue_rows}",
-        f"personal dashboards created: {dashboards}",
         f"row icons set: {icon_writes}",
         *(f"FAILED {line}" for line in failures),
     ]

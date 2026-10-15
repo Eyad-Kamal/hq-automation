@@ -189,7 +189,10 @@ Every run (every 10 minutes) does, in order:
 5. **daily**: only once per Cairo day. Creates today's LeetCode daily task and upsolve reminders (and
    topic practice tasks when `AUTO_PRACTICE_TASKS` is 1), and marks yesterday's unfinished auto tasks
    (practice and LeetCode daily) as Skipped.
-6. **weekly**: only after Saturday 00:10 (Cairo time), once per week.
+6. **dashboards**: after daily, so each view's Who option exists. Creates a dashboard for each active member
+   without one, and once per Cairo day (also right after a recompute, and on `--force`) creates any linked view
+   that is missing. Failed views are listed with Notion's error text in the Sync Log.
+7. **weekly**: only after Saturday 00:10 (Cairo time), once per week.
 
 Every job can run any number of times. Each record has a stable key, so reruns update or skip
 instead of duplicating. Your own edits are kept: the import fills only empty fields and never

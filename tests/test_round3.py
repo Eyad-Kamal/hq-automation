@@ -15,7 +15,7 @@ import requests
 from hq import config, icons
 from hq import notion as nt
 from hq import schema as S
-from hq.jobs import OK, WARNING, contests, daily, execute, onboard, recompute, cairo_end_of_day
+from hq.jobs import OK, WARNING, cairo_end_of_day, contests, daily, dashboards, execute, onboard, recompute
 from hq.notion import Notion
 from hq.repo import Repo, cairo_day_of, get_date, get_number, get_relation, get_select, get_status, get_text, get_title
 from hq.sources import leetcode
@@ -438,6 +438,7 @@ def test_is_ours_recognises_only_this_modules_icons() -> None:
 def test_rows_created_by_the_jobs_carry_icons() -> None:
     w = build_world()
     onboard.run(w.context())
+    dashboards.run(w.context())
     queue = w.notion.rows(S.DB_LEARNING_QUEUE)
     assert queue and all(r["icon"] == icons.ui("topic") for r in queue)
     assert icons.ui("member") in w.notion.child_icons, "personal dashboards get the member icon"

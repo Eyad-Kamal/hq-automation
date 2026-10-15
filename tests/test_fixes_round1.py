@@ -341,7 +341,7 @@ def test_F5_real_path_second_run_adds_no_sync_log_rows() -> None:
     cli.run_auto(w.context(now=config_state_now))
     before = len(w.notion.rows(S.DB_SYNC_LOG))
     results = cli.run_auto(w.context(now=config_state_now + timedelta(minutes=5)))
-    assert [r.job for r in results] == ["onboard", "contests", "alerts"], "imports and daily are not due"
+    assert [r.job for r in results] == ["onboard", "contests", "alerts", "dashboards"], "imports and daily are not due"
     assert len(w.notion.rows(S.DB_SYNC_LOG)) == before, "a quiet run with nothing to report writes no row"
 
 
