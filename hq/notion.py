@@ -175,18 +175,27 @@ class Notion:
         ds_id: str,
         properties: Json,
         children: list[Json] | None = None,
+        icon: Json | None = None,
     ) -> Json:
-        """Create a row in a data source."""
+        """Create a row in a data source. ``icon`` is a Notion icon object (see hq.icons)."""
         body: Json = {
             "parent": {"type": "data_source_id", "data_source_id": ds_id},
             "properties": properties,
         }
         if children:
             body["children"] = children
+        if icon is not None:
+            body["icon"] = icon
         # Not retried on 5xx or network errors: the row may already exist.
         return self._call("POST", "/pages", body=body, retry_server_errors=False)
 
-    def create_child_page(self, parent_page_id: str, title: str, children: Sequence[Json] | None = None) -> Json:
+    def create_child_page(
+        self,
+        parent_page_id: str,
+        title: str,
+        children: Sequence[Json] | None = None,
+        icon: Json | None = None,
+    ) -> Json:
         """Create a page under another page (not retried: the page may already exist)."""
         body: Json = {
             "parent": {"type": "page_id", "page_id": parent_page_id},
@@ -194,6 +203,8 @@ class Notion:
         }
         if children:
             body["children"] = list(children)[:APPEND_CHILDREN_LIMIT]
+        if icon is not None:
+            body["icon"] = icon
         return self._call("POST", "/pages", body=body, retry_server_errors=False)
 
     def create_view(self, body: Json) -> Json:
@@ -206,9 +217,15 @@ class Notion:
         page = self._call("GET", f"/blocks/{block_id}/children", params={"page_size": page_size})
         return list(page.get("results", []))
 
-    def update_page(self, page_id: str, properties: Json) -> Json:
-        """Patch the properties of a page or row."""
-        return self._call("PATCH", f"/pages/{page_id}", body={"properties": properties})
+    def update_page(self, page_id: str, properties: Json | None = None, *, icon: Json | None = None) -> Json:
+        """Patch the properties and/or the icon of a page or row. ``icon`` is sent at the top
+        level of the request body, as the Notion API expects."""
+        body: Json = {}
+        if properties is not None:
+            body["properties"] = properties
+        if icon is not None:
+            body["icon"] = icon
+        return self._call("PATCH", f"/pages/{page_id}", body=body)
 
     def get_page(self, page_id: str) -> Json:
         """Retrieve a page or row."""

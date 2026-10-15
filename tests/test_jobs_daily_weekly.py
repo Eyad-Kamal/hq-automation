@@ -11,7 +11,7 @@ from hq import schema as S
 from hq.jobs import cairo_end_of_day, daily, imports, onboard, recompute, weekly
 from hq.repo import get_checkbox, get_date, get_number, get_relation, get_select, get_status, get_text
 from hq.timeutil import CAIRO_TZ
-from tests.fakes import NOW, NOW_SATURDAY, build_world, seed_eyad_solves
+from tests.fakes import NOW, NOW_SATURDAY, build_world, enable_practice, seed_eyad_solves
 
 TODAY = date(2026, 10, 15)
 PROBLEMSET = [
@@ -26,6 +26,7 @@ PROBLEMSET = [
 
 def _setup():
     w = build_world()
+    enable_practice(w)  # AUTO_PRACTICE_TASKS defaults to 0
     w.sources.problemset = list(PROBLEMSET)
     onboard.run(w.context())
     w.notion.reset_writes()
@@ -53,6 +54,8 @@ def test_daily_creates_one_practice_task_per_member_and_is_idempotent() -> None:
         },
     )
     assert seeded
+    # LeetCode daily is off here (its fetch is not faked); test_round3 covers it.
+    w.notion.seed(S.DB_CONFIG, {S.P_Config.TITLE: nt.p_title("LEETCODE_DAILY_TASKS"), S.P_Config.NUMBER: nt.p_number(0)})
     w.notion.reset_writes()
 
     result = daily.run(w.context())

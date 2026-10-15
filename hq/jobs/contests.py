@@ -23,6 +23,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta
 
+from hq import icons
 from hq import notion as nt
 from hq import schema as S
 from hq.config import num
@@ -147,10 +148,8 @@ def _upsert_contest(ctx: Context, c: Contest) -> tuple[bool, bool]:
     props = contest_props(c, phase, contest_kind.classify(c.platform, c.name))
     page = repo.find(S.DB_CONTESTS, S.P_Contests.EXTERNAL_ID, c.external_id)
     if page is None:
-        repo.create(
-            S.DB_CONTESTS,
-            {**props, S.P_Contests.TASKS_CREATED: nt.p_checkbox(False), S.P_Contests.ALERT_SENT: nt.p_checkbox(False)},
-        )
+        new_props = {**props, S.P_Contests.TASKS_CREATED: nt.p_checkbox(False), S.P_Contests.ALERT_SENT: nt.p_checkbox(False)}
+        repo.create(S.DB_CONTESTS, new_props, icon=icons.icon_for(S.DB_CONTESTS, new_props))
         return True, False
     # Identity fields are fill-only after the first create (F14).
     fill_only_names = (S.P_Contests.TITLE, S.P_Contests.PLATFORM, S.P_Contests.KIND, S.P_Contests.LINK, S.P_Contests.RATED)
@@ -186,7 +185,7 @@ def _create_contest_tasks(ctx: Context, contest_page: dict, members: list) -> in
         )
         props[S.P_Tasks.CONTEST] = nt.p_relation([contest_page["id"]])
         props[S.P_Tasks.LINKS] = nt.p_text(link)
-        repo.create(S.DB_TASKS, props)
+        repo.create(S.DB_TASKS, props, icon=icons.icon_for(S.DB_TASKS, props))
         made += 1
     return made
 

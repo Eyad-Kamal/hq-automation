@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import logging
 
+from hq import icons
 from hq import notion as nt
 from hq import schema as S
 from hq.config import num
@@ -61,14 +62,24 @@ def run(ctx: Context) -> JobResult:
             failures.append(f"{member.name}: {type(exc).__name__}: {exc}")
 
     dashboards = dashboards_mod.ensure_dashboards(ctx, members)
+    # Row icons (ICON_BACKFILL_PER_RUN rows per run). Icon writes are not counted as items, so a
+    # quiet run with only icon work writes no Sync Log row.
+    icon_writes = 0
+    try:
+        icon_writes = icons.backfill(repo, ctx.cfg)
+    except Exception as exc:  # noqa: BLE001 - icons are cosmetic; they must not fail the job
+        log.exception("row icon backfill failed")
+        failures.append(f"icon backfill: {type(exc).__name__}: {exc}")
     details = [
         f"members checked: {len(members)}",
         f"learning queue rows created: {queue_rows}",
         f"personal dashboards created: {dashboards}",
+        f"row icons set: {icon_writes}",
         *(f"FAILED {line}" for line in failures),
     ]
     result = WARNING if failures else OK
-    return JobResult(job=JOB, result=result, items=repo.writes - writes_before, details="\n".join(details))
+    items = repo.writes - writes_before - icon_writes
+    return JobResult(job=JOB, result=result, items=items, details="\n".join(details))
 
 
 def _onboard_member(ctx: Context, member, topics, pairs: set) -> int:
@@ -79,17 +90,15 @@ def _onboard_member(ctx: Context, member, topics, pairs: set) -> int:
         if (member.id, topic.id) in pairs:
             continue
         priority = "Important" if topic.core and topic.level_no == member.level_no else "Optional"
-        repo.create(
-            S.DB_LEARNING_QUEUE,
-            {
-                S.P_LearningQueue.TITLE: nt.p_title(f"{topic.name} · {member.name}"),
-                S.P_LearningQueue.WHO: nt.p_select(member.name),
-                S.P_LearningQueue.MEMBER: nt.p_relation([member.id]),
-                S.P_LearningQueue.TOPIC: nt.p_relation([topic.id]),
-                S.P_LearningQueue.QUEUE_STATUS: nt.p_status("Queued"),
-                S.P_LearningQueue.PRIORITY: nt.p_select(priority),
-            },
-        )
+        queue_props = {
+            S.P_LearningQueue.TITLE: nt.p_title(f"{topic.name} · {member.name}"),
+            S.P_LearningQueue.WHO: nt.p_select(member.name),
+            S.P_LearningQueue.MEMBER: nt.p_relation([member.id]),
+            S.P_LearningQueue.TOPIC: nt.p_relation([topic.id]),
+            S.P_LearningQueue.QUEUE_STATUS: nt.p_status("Queued"),
+            S.P_LearningQueue.PRIORITY: nt.p_select(priority),
+        }
+        repo.create(S.DB_LEARNING_QUEUE, queue_props, icon=icons.icon_for(S.DB_LEARNING_QUEUE, queue_props))
         pairs.add((member.id, topic.id))
         created += 1
 

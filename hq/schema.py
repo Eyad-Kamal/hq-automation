@@ -422,6 +422,7 @@ class P_DailyLog:
     WEEK = "Week"
     PROBLEMS = "Problems"
     POINTS = "Points"
+    CUMULATIVE_POINTS = "Cumulative Points"  # added in round 3: member's running total up to and including this day
     CONTESTS = "Contests"
     MAX_RATING_SOLVED = "Max Rating Solved"
     ACTIVE = "Active"
@@ -579,7 +580,13 @@ class ConfigKey:
     DAILY_LOG_DAYS = "DAILY_LOG_DAYS"  # Daily Log rows recomputed per member (days back from today)
     WEEKLY_BACKFILL_WEEKS = "WEEKLY_BACKFILL_WEEKS"  # complete past weeks whose Weekly Summary rows are kept filled
     DASHBOARDS_AUTO = "DASHBOARDS_AUTO"  # 1 = create personal dashboard pages for members with an empty Dashboard URL
+    AUTO_PRACTICE_TASKS = "AUTO_PRACTICE_TASKS"  # 1 = daily auto Topic Practice tasks; 0 (default) = coaches assign them
+    LEETCODE_DAILY_TASKS = "LEETCODE_DAILY_TASKS"  # 1 = one "LeetCode daily" task per Active member each day
+    ICON_BACKFILL_PER_RUN = "ICON_BACKFILL_PER_RUN"  # most empty row icons set per run (auto job)
 
+
+# Source Key prefix of the automatic "LeetCode daily" task: "lcdaily:<date>:<member id>".
+LC_DAILY_SOURCE_PREFIX = "lcdaily:"
 
 # CF tag vocabulary (options of "CF Tags" on Topics and Problems).
 CF_TAGS: tuple[str, ...] = (

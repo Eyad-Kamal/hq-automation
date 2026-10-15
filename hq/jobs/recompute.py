@@ -34,6 +34,7 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 from typing import Any
 
+from hq import icons
 from hq import notion as nt
 from hq import schema as S
 from hq.config import num
@@ -55,6 +56,7 @@ from hq.repo import (
     get_text,
     get_title,
     get_url,
+    is_lc_daily_task,
 )
 from hq.schema import ConfigKey as K
 from hq.schema import Mode
@@ -262,6 +264,7 @@ def daily_log_props(
     frozen: bool,
     streak_value: int,
     target: int,
+    cumulative: float | None = None,
 ) -> dict[str, Any]:
     return {
         S.P_DailyLog.TITLE: nt.p_title(f"{member.name} · {day.isoformat()}"),
@@ -272,6 +275,7 @@ def daily_log_props(
         S.P_DailyLog.WEEK: nt.p_text(week_label(day)),
         S.P_DailyLog.PROBLEMS: nt.p_number(stat.problems),
         S.P_DailyLog.POINTS: nt.p_number(round(stat.points, 2)),
+        S.P_DailyLog.CUMULATIVE_POINTS: nt.p_number(None if cumulative is None else round(cumulative, 2)),
         S.P_DailyLog.CONTESTS: nt.p_number(stat.contests),
         S.P_DailyLog.MAX_RATING_SOLVED: nt.p_number(stat.max_rating or None),
         S.P_DailyLog.ACTIVE: nt.p_checkbox(active),
@@ -299,7 +303,23 @@ def ensure_daily_log(ctx: Context, member: Member, day: date) -> dict:
         streak_value=0,
         target=daily_target(member, ctx.cfg),
     )
-    return ctx.repo.create(S.DB_DAILY_LOG, props)
+    return ctx.repo.create(S.DB_DAILY_LOG, props, icon=icons.icon_for(S.DB_DAILY_LOG, props))
+
+
+def _cumulative_points(stats: dict[date, DayStat], day: date) -> float:
+    """Total points of every solved problem up to and including ``day`` (solves without a date are not counted)."""
+    return round(sum(stat.points for stday, stat in stats.items() if stday <= day), 2)
+
+
+def _upsert_daily_log(repo: Repo, member: Member, day: date, props: dict[str, Any], *, active: bool, frozen: bool) -> None:
+    """Create or sync one Daily Log row, and keep its state icon (streak / daily / freeze) current."""
+    key = f"{member.id}:{day.isoformat()}"
+    page = repo.find(S.DB_DAILY_LOG, S.P_DailyLog.SOURCE_KEY, key)
+    if page is None:
+        repo.create(S.DB_DAILY_LOG, props, icon=icons.icon_for(S.DB_DAILY_LOG, props))
+        return
+    repo.sync(S.DB_DAILY_LOG, page, props)
+    icons.daily_log_state(repo, page, active=active, frozen=frozen)
 
 
 def run(ctx: Context) -> JobResult:
@@ -373,8 +393,9 @@ def _recompute_member(
             frozen=day in current_state.frozen_days,
             streak_value=day_streak,
             target=target,
+            cumulative=_cumulative_points(stats, day),
         )
-        repo.upsert(S.DB_DAILY_LOG, S.P_DailyLog.SOURCE_KEY, f"{member.id}:{day.isoformat()}", props)
+        _upsert_daily_log(repo, member, day, props, active=day in active, frozen=day in current_state.frozen_days)
 
     # Member totals.
     week = week_start(today)
@@ -616,41 +637,53 @@ def _award_badges(repo: Repo, member: Member, stat_values: dict[str, Any], today
         key = f"{badge}:{member.id}"
         if repo.find(S.DB_ACHIEVEMENTS, S.P_Achievements.SOURCE_KEY, key) is not None:
             continue
-        repo.create(
-            S.DB_ACHIEVEMENTS,
-            {
-                S.P_Achievements.TITLE: nt.p_title(f"{badge} · {member.name}"),
-                S.P_Achievements.WHO: nt.p_select(member.name),
-                S.P_Achievements.MEMBER: nt.p_relation([member.id]),
-                S.P_Achievements.BADGE: nt.p_select(badge),
-                S.P_Achievements.TIER: nt.p_select(tier),
-                S.P_Achievements.EARNED_ON: nt.p_date(today, with_time=False),
-                S.P_Achievements.DETAIL: nt.p_text(detail),
-                S.P_Achievements.SOURCE_KEY: nt.p_text(key),
-            },
-        )
+        props = {
+            S.P_Achievements.TITLE: nt.p_title(f"{badge} · {member.name}"),
+            S.P_Achievements.WHO: nt.p_select(member.name),
+            S.P_Achievements.MEMBER: nt.p_relation([member.id]),
+            S.P_Achievements.BADGE: nt.p_select(badge),
+            S.P_Achievements.TIER: nt.p_select(tier),
+            S.P_Achievements.EARNED_ON: nt.p_date(today, with_time=False),
+            S.P_Achievements.DETAIL: nt.p_text(detail),
+            S.P_Achievements.SOURCE_KEY: nt.p_text(key),
+        }
+        repo.create(S.DB_ACHIEVEMENTS, props, icon=icons.icon_for(S.DB_ACHIEVEMENTS, props))
 
 
 def _sync_practice_tasks(repo: Repo, member: Member) -> None:
-    """Done Count and Done status for the member's auto Topic Practice tasks."""
-    solved_keys = {
-        get_text(p, S.P_Problems.PROBLEM_KEY)
-        for p in repo.rows(S.DB_PROBLEMS)
-        if get_status(p, S.P_Problems.STATUS) == "Solved" and member.id in get_relation(p, S.P_Problems.MEMBER)
-    }
+    """Done Count and Done status for the member's auto Topic Practice tasks and LeetCode daily tasks.
+
+    A listed problem counts as done when the member has a solved Problems row with the same
+    normalized Problem Key or the same normalized Link (see ``problem_ref``). A LeetCode daily
+    task lists one problem, so it becomes Done with that solve."""
+    solved: set[str] = set()
+    for p in repo.rows(S.DB_PROBLEMS):
+        if get_status(p, S.P_Problems.STATUS) == "Solved" and member.id in get_relation(p, S.P_Problems.MEMBER):
+            solved |= identities(get_text(p, S.P_Problems.PROBLEM_KEY), get_url(p, S.P_Problems.LINK))
     for task in repo.rows(S.DB_TASKS):
-        if get_select(task, S.P_Tasks.TYPE) != "Topic Practice" or get_select(task, S.P_Tasks.ORIGIN) != "Auto":
+        auto_practice = get_select(task, S.P_Tasks.TYPE) == "Topic Practice" and get_select(task, S.P_Tasks.ORIGIN) == "Auto"
+        if not (auto_practice or is_lc_daily_task(task)):
             continue
         if member.id not in get_relation(task, S.P_Tasks.ASSIGNEE):
             continue
-        keys = _task_problem_keys(task)
-        done = sum(1 for key in keys if key in solved_keys)
+        done = sum(1 for ids in _task_problem_identities(task) if ids & solved)
         props: dict[str, Any] = {S.P_Tasks.DONE_COUNT: nt.p_number(done)}
         target = get_number(task, S.P_Tasks.TARGET)
         status = get_status(task, S.P_Tasks.STATUS)
         if target and done >= target and status in TASK_OPEN_STATUSES:
             props[S.P_Tasks.STATUS] = nt.p_status("Done")
         repo.sync(S.DB_TASKS, task, props)
+
+
+def _task_problem_identities(task: dict) -> list[set[str]]:
+    """Identities of each problem listed in a task's Links ("<key> | <url>" per line; the URL is optional)."""
+    out: list[set[str]] = []
+    for line in get_text(task, S.P_Tasks.LINKS).splitlines():
+        key, _, link = line.partition("|")
+        ids = identities(key.strip(), link.strip())
+        if ids:
+            out.append(ids)
+    return out
 
 
 def _task_problem_keys(task: dict) -> list[str]:

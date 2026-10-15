@@ -40,6 +40,8 @@ class FakeNotion:
         self.create_faults: list[str] = []  # "fail" | "commit_then_fail", consumed per create
         self.query_log: list[str] = []
         self.child_pages: list[tuple[str, str, list[dict[str, Any]]]] = []
+        self.child_icons: list[Any] = []  # icon sent with each child page create
+        self.icon_updates: list[tuple[str, dict[str, Any]]] = []  # (page id, icon) for icon-only patches
         self.views: list[dict[str, Any]] = []
         self.view_faults: set[str] = set()  # view types the fake rejects with HTTP 400
         self._n = 0
@@ -52,13 +54,13 @@ class FakeNotion:
         self.query_log.append(ds_id)
         return copy.deepcopy(self.tables[ds_id])
 
-    def create_page(self, ds_id: str, properties: dict[str, Any], children: Any = None) -> dict[str, Any]:
+    def create_page(self, ds_id: str, properties: dict[str, Any], children: Any = None, icon: Any = None) -> dict[str, Any]:
         self._n += 1
         page_id = f"page-{self._n:05d}"
         fault = self.create_faults.pop(0) if self.create_faults else None
         if fault == "fail":
             raise NotionError("POST /pages -> HTTP 500 (injected: nothing stored)")
-        page = {"id": page_id, "parent": {"type": "data_source_id", "data_source_id": ds_id}, "properties": copy.deepcopy(properties)}
+        page = {"id": page_id, "parent": {"type": "data_source_id", "data_source_id": ds_id}, "properties": copy.deepcopy(properties), "icon": copy.deepcopy(icon)}
         self.tables[ds_id].append(page)
         self.creates.append((ds_id, page_id))
         if children:
@@ -70,12 +72,16 @@ class FakeNotion:
     def block_children(self, block_id: str, page_size: int = 100) -> list[dict[str, Any]]:
         return [{"id": f"{block_id}-b{i}"} for i in range(len(self.blocks.get(block_id, [])))][:page_size]
 
-    def update_page(self, page_id: str, properties: dict[str, Any]) -> dict[str, Any]:
+    def update_page(self, page_id: str, properties: dict[str, Any] | None = None, *, icon: Any = None) -> dict[str, Any]:
         page = self.page(page_id)
         if page is None:
             raise KeyError(page_id)
-        page["properties"].update(copy.deepcopy(properties))
-        self.updates.append((page_id, copy.deepcopy(properties)))
+        if properties:
+            page["properties"].update(copy.deepcopy(properties))
+            self.updates.append((page_id, copy.deepcopy(properties)))
+        if icon is not None:
+            page["icon"] = copy.deepcopy(icon)
+            self.icon_updates.append((page_id, copy.deepcopy(icon)))
         return copy.deepcopy(page)
 
     def get_page(self, page_id: str) -> dict[str, Any]:
@@ -100,10 +106,11 @@ class FakeNotion:
             names.update(row.get("properties", {}).keys())
         return {"id": ds_id, "properties": {n: {"id": f"id-{n}", "type": "x"} for n in sorted(names)}}
 
-    def create_child_page(self, parent_page_id: str, title: str, children: Any = None) -> dict[str, Any]:
+    def create_child_page(self, parent_page_id: str, title: str, children: Any = None, icon: Any = None) -> dict[str, Any]:
         self._n += 1
         page_id = f"page-{self._n:05d}"
         self.child_pages.append((parent_page_id, title, copy.deepcopy(list(children or []))))
+        self.child_icons.append(copy.deepcopy(icon))
         if children:
             self.blocks.setdefault(page_id, []).extend(copy.deepcopy(list(children)))
         return {"id": page_id, "url": f"https://www.notion.so/{page_id}"}
@@ -134,13 +141,14 @@ class FakeNotion:
         return self.create_page(self.ids[title], properties)["id"]
 
     def write_total(self) -> int:
-        return len(self.creates) + len(self.updates) + len(self.comments) + len(self.appends)
+        return len(self.creates) + len(self.updates) + len(self.comments) + len(self.appends) + len(self.icon_updates)
 
     def reset_writes(self) -> None:
         self.creates.clear()
         self.updates.clear()
         self.comments.clear()
         self.appends.clear()
+        self.icon_updates.clear()
 
 
 @dataclass
@@ -154,6 +162,7 @@ class FakeSources:
     at: dict[str, list[Solve]] = field(default_factory=dict)
     at_hist: dict[str, list[RatingChange]] = field(default_factory=dict)
     lc: dict[str, list[Solve]] = field(default_factory=dict)
+    lc_daily: Any = None  # a leetcode.DailyQuestion; None means the daily fetch failed
     problemset: list[dict[str, Any]] = field(default_factory=list)
     calls: list[str] = field(default_factory=list)
     failing: set[str] = field(default_factory=set)  # handles whose calls "fail"
@@ -213,6 +222,11 @@ class FakeSources:
         if self._fails(username, strict):
             return None if strict else []
         return [s for s in self.lc.get(username, []) if s.solved_at_utc >= since]
+
+    def lc_daily_question(self) -> Any:
+        """``lc_daily`` as set by the test; None (a failed fetch) by default."""
+        self.calls.append("lc_daily")
+        return self.lc_daily
 
 
 def cf_solve(
@@ -382,6 +396,12 @@ def build_world(*, subscriptions: list[str] | None = None) -> World:
         sara=sara,
         old=old,
     )
+
+
+def enable_practice(w: World) -> None:
+    """Turn on the automatic Topic Practice tasks (Config AUTO_PRACTICE_TASKS = 1; the default is 0).
+    Call before the first job run of the test."""
+    w.notion.seed(S.DB_CONFIG, {S.P_Config.TITLE: nt.p_title("AUTO_PRACTICE_TASKS"), S.P_Config.NUMBER: nt.p_number(1)})
 
 
 def contest(name: str, start: datetime, *, platform: str = "Codeforces", duration: int = 120, ext: str | None = None) -> Contest:

@@ -368,19 +368,28 @@ class Repo:
                 index.setdefault(new, page)
 
     # -- writing ------------------------------------------------------------
-    def create(self, db: str, properties: Json, children: list[Json] | None = None) -> Json:
+    def create(
+        self,
+        db: str,
+        properties: Json,
+        children: list[Json] | None = None,
+        icon: Json | None = None,
+    ) -> Json:
         """Create a row. For a row with a Source Key / External ID, a failed create
         (5xx, timeout) is not blindly repeated: the table is re-read, an existing row
         with that key is adopted (after syncing it), and only if none exists is the
-        create retried once. Rows without a key are never retried."""
+        create retried once. Rows without a key are never retried. ``icon`` is a Notion
+        icon object (see ``hq.icons``); it is sent with the create and cached on the row."""
         title = _title_of(properties)
         self.writes += 1
         if self.dry_run:
             self._seq += 1
             page: Json = {"id": f"dry-run-{self._seq}", "properties": copy.deepcopy(properties)}
+            if icon is not None:
+                page["icon"] = copy.deepcopy(icon)
             self._record(f"create {db}: {title}")
         else:
-            page = self._create_remote(db, properties, children)
+            page = self._create_remote(db, properties, children, icon)
         if db not in self._rows:
             # Table not loaded in this run (e.g. Sync Log): keep the page for
             # the first later load instead of querying a large table now.
@@ -391,10 +400,10 @@ class Repo:
         self._reindex(db, page)
         return page
 
-    def _create_remote(self, db: str, properties: Json, children: list[Json] | None) -> Json:
+    def _create_remote(self, db: str, properties: Json, children: list[Json] | None, icon: Json | None = None) -> Json:
         key_prop, key = _create_key(db, properties)
         try:
-            resp = self.notion.create_page(self.ds(db), properties, children)
+            resp = self.notion.create_page(self.ds(db), properties, children, icon=icon)
         except NotionError as exc:
             if key is None:
                 raise
@@ -405,11 +414,14 @@ class Repo:
                 log.warning("adopted existing %s row for %s=%s", db, key_prop, key)
                 self.sync(db, existing, properties)
                 return existing
-            resp = self.notion.create_page(self.ds(db), properties, children)
-        return {
+            resp = self.notion.create_page(self.ds(db), properties, children, icon=icon)
+        page: Json = {
             "id": resp["id"],
             "properties": copy.deepcopy(resp.get("properties") or properties),
         }
+        if icon is not None:
+            page["icon"] = copy.deepcopy(icon)
+        return page
 
     def reload(self, db: str) -> None:
         """Re-read one table from Notion and rebuild its lookup indexes."""
@@ -422,6 +434,15 @@ class Repo:
     def has_children(self, page_id: str) -> bool:
         """Whether a page has at least one child block (a read; also in dry-run)."""
         return bool(self.notion.block_children(page_id, page_size=1))
+
+    def set_icon(self, db: str, page: Json, icon: Json) -> None:
+        """Set the icon of an existing row (dry-run aware). The cached row is updated too."""
+        self.writes += 1
+        if self.dry_run:
+            self._record(f"icon {db}: {_title_of(page.get('properties') or {}) or page['id']}")
+        else:
+            self.notion.update_page(page["id"], icon=icon)
+        page["icon"] = copy.deepcopy(icon)
 
     def update(self, db: str, page: Json, properties: Json) -> Json:
         if not properties:
@@ -450,22 +471,28 @@ class Repo:
             self.update(db, page, changes)
         return changes
 
-    def upsert(self, db: str, key_prop: str, key: str, properties: Json) -> tuple[Json, bool]:
-        """Create the row keyed by ``key`` or sync it. Returns (page, created)."""
+    def upsert(self, db: str, key_prop: str, key: str, properties: Json, icon: Json | None = None) -> tuple[Json, bool]:
+        """Create the row keyed by ``key`` (with ``icon``) or sync it. Returns (page, created)."""
         page = self.find(db, key_prop, key)
         if page is None:
-            return self.create(db, properties), True
+            return self.create(db, properties, icon=icon), True
         self.sync(db, page, properties)
         return page, False
 
-    def create_child_page(self, parent_page_id: str, title: str, children: list[Json] | None = None) -> Json:
+    def create_child_page(
+        self,
+        parent_page_id: str,
+        title: str,
+        children: list[Json] | None = None,
+        icon: Json | None = None,
+    ) -> Json:
         """Create a page under ``parent_page_id`` (dry-run aware). Returns the page (with url)."""
         self.writes += 1
         if self.dry_run:
             self._seq += 1
             self._record(f"create page under {parent_page_id}: {title}")
             return {"id": f"dry-run-page-{self._seq}", "url": ""}
-        resp = self.notion.create_child_page(parent_page_id, title, children)
+        resp = self.notion.create_child_page(parent_page_id, title, children, icon=icon)
         return {"id": resp["id"], "url": resp.get("url", "")}
 
     def create_view(self, body: Json) -> Json:
@@ -567,6 +594,15 @@ class Repo:
                 )
             )
         return out
+
+
+def is_lc_daily_task(task: Json) -> bool:
+    """True for the automatic "LeetCode daily" task (Type Custom, Origin Auto, LC daily Source Key)."""
+    return (
+        get_select(task, S.P_Tasks.TYPE) == "Custom"
+        and get_select(task, S.P_Tasks.ORIGIN) == "Auto"
+        and get_text(task, S.P_Tasks.SOURCE_KEY).startswith(S.LC_DAILY_SOURCE_PREFIX)
+    )
 
 
 def member_task_props(

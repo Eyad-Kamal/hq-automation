@@ -1,18 +1,25 @@
 """Job ``daily``: once per Cairo day. Runs only when STATE_LAST_DAILY is before today.
 
-1. Overdue auto practice tasks (Origin Auto, Type Topic Practice, still open,
-   due before today) become Skipped. Yesterday's are included, and so are any
-   older ones left behind by a missed run.
-2. Each active member gets today's Daily Log row (if missing) and one auto
-   practice task "🎯 <topic>: <n> problems". The topic comes from the member's
+1. Overdue auto tasks become Skipped (still open, due before today): Topic Practice
+   tasks (Origin Auto) and LeetCode daily tasks. Yesterday's are included, and so are
+   any older ones left behind by a missed run.
+2. Topic practice (only when AUTO_PRACTICE_TASKS = 1; default 0, coaches assign them):
+   each active member gets one auto practice task "🎯 <topic>: <n> problems". The topic comes from the member's
    learning queue. If the member has any "Learning" row, only those rows are used
    (highest priority, then the earliest deadline, then topic order); otherwise
    Practicing rows, then the first Queued core topic of the member's level. Problems come from the Codeforces problemset, filtered
    by the topic's CF tags and rating band, excluding problems already solved.
    The pick is deterministic: seed = hash(member id, date). Source Key
    "auto:<date>:<member id>" makes the task unique per day.
-3. Upsolve reminders: a contest entry (Attended/Upsolving) whose contest ended at
-   least a day ago and whose Upsolve % is below 100 gets one "🔁 Upsolve" task.
+3. LeetCode daily (when LEETCODE_DAILY_TASKS = 1, default 1): one "💡 LeetCode daily: <title>"
+   task per active member for LeetCode's daily challenge. Source Key
+   "lcdaily:<date>:<member id>". If the question cannot be read, a Warning is written and
+   no task is created. LeetCode's daily date is compared with the UTC day (assumed to roll
+   over at UTC midnight, not verified). A question for another day is not assigned: the
+   day's state is left unset before 06:00 Cairo so the next run retries, and after 06:00
+   a Warning is written.
+4. Upsolve reminders: a contest entry (Attended/Upsolving) whose contest ended within
+   UPSOLVE_WINDOW_DAYS (default 7) and whose Upsolve % is below 100 gets one "🔁 Upsolve" task.
    Source Key "upsolve:<entry id>:<member id>".
 """
 
@@ -20,20 +27,21 @@ from __future__ import annotations
 
 import hashlib
 import logging
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from hq import config
+from hq import icons
 from hq import notion as nt
 from hq import schema as S
 from hq.config import num
 from hq.jobs import OK, WARNING, Context, JobResult, cairo_end_of_day, cairo_midnight
 from hq.logic import autotasks
 from hq.jobs.recompute import ensure_daily_log
-from hq.repo import Member, Repo, Topic, cairo_day_of, get_date, get_number, get_relation, get_select, get_status, get_text, get_title, member_task_props
+from hq.repo import Member, Repo, Topic, cairo_day_of, get_date, get_number, get_relation, get_select, get_status, get_text, get_title, is_lc_daily_task, member_task_props
 from hq.schema import ConfigKey as K
 from hq.logic.problem_ref import norm_key
-from hq.timeutil import cairo_date
+from hq.timeutil import CAIRO_TZ, cairo_date
 
 log = logging.getLogger("hq.jobs.daily")
 
@@ -42,6 +50,8 @@ OPEN_PRACTICE_STATUSES = frozenset({"To Do", "Planned", "In Progress"})
 PRIORITY_ORDER = {"Very Important": 0, "Important": 1, "Optional": 2}
 UPSOLVE_ENTRY_STATUSES = frozenset({"Attended", "Upsolving"})
 COMPETENT_OR_MORE = frozenset({"Competent", "Proficient", "Master"})
+# Before this Cairo hour a LeetCode day that is not yet today (UTC) is expected: the job is retried.
+LC_DAILY_RETRY_UNTIL_CAIRO_HOUR = 6
 
 
 def daily_due(ctx: Context) -> bool:
@@ -56,41 +66,76 @@ def run(ctx: Context) -> JobResult:
     lq_rows = repo.rows(S.DB_LEARNING_QUEUE)
     skipped = _skip_overdue_practice(repo, today)
     stale_upsolve = _expire_stale_upsolve_tasks(ctx)
-    practice = upsolve = 0
+    practice_on = int(num(ctx.cfg, K.AUTO_PRACTICE_TASKS)) == 1
+    lc_on = int(num(ctx.cfg, K.LEETCODE_DAILY_TASKS)) == 1
+    practice = upsolve = lc_tasks = 0
     notes: list[str] = []
     failures: list[str] = []
+    lc_question, lc_defer, lc_note = _read_lc_daily(ctx) if lc_on else (None, False, "")
+    if lc_note:
+        notes.append(lc_note)
     members = ctx.active_members()
     for member in members:
         # One member's failure must not stop the others (F2).
         try:
             ensure_daily_log(ctx, member, today)
-            made, note = _create_practice_task(ctx, member, today, topics, lq_rows)
-            practice += made
-            if note:
-                notes.append(note)
+            if practice_on:
+                made, note = _create_practice_task(ctx, member, today, topics, lq_rows)
+                practice += made
+                if note:
+                    notes.append(note)
+            if lc_question is not None:
+                lc_tasks += _create_lc_daily_task(ctx, member, lc_question, today)
             upsolve += _create_upsolve_tasks(ctx, member, today)
         except Exception as exc:  # noqa: BLE001
             log.exception("daily failed for %s", member.name)
             failures.append(f"FAILED {member.name}: {type(exc).__name__}: {exc}")
     # Set even when some members failed: the day's job ran, and the failures are reported.
-    config.set_state(repo, config.STATE_LAST_DAILY, today.isoformat())
+    # Not set while LeetCode's daily is still the previous day's: the next run retries.
+    if not lc_defer:
+        config.set_state(repo, config.STATE_LAST_DAILY, today.isoformat())
     details = [
-        f"overdue practice tasks skipped: {skipped}",
-        f"practice tasks created: {practice} for {len(members)} member(s)",
+        f"overdue auto tasks skipped: {skipped}",
+        (
+            f"practice tasks created: {practice} for {len(members)} member(s)"
+            if practice_on
+            else "topic practice tasks: off (AUTO_PRACTICE_TASKS is 0)"
+        ),
+        (f"LeetCode daily tasks created: {lc_tasks}" if lc_on else "LeetCode daily tasks: off (LEETCODE_DAILY_TASKS is 0)"),
         f"upsolve reminders created: {upsolve}",
         f"stale upsolve reminders skipped (contest ended before the window): {stale_upsolve}",
+        *(["LeetCode daily not yet published for today (UTC): retrying on the next run"] if lc_defer else []),
         *notes,
         *failures,
     ]
     # A member with no task (no topic, or no problems picked) or a failure is a Warning.
     result = WARNING if (notes or failures) else OK
-    return JobResult(job=JOB, result=result, items=practice + upsolve + skipped + stale_upsolve, details="\n".join(details))
+    items = practice + upsolve + skipped + stale_upsolve + lc_tasks
+    return JobResult(job=JOB, result=result, items=items, details="\n".join(details))
+
+
+def _read_lc_daily(ctx: Context) -> tuple[Any, bool, str]:
+    """(question or None, defer the day's state, warning text).
+
+    A failed read is a Warning. A question for another day than the current UTC day
+    (LeetCode's day, not verified to roll over at UTC midnight) is not assigned: before
+    LC_DAILY_RETRY_UNTIL_CAIRO_HOUR the job is deferred, later it is a Warning."""
+    question = ctx.sources.lc_daily_question()
+    if question is None:
+        return None, False, "LeetCode daily: the question could not be read; no LeetCode daily tasks created"
+    utc_today = ctx.now.astimezone(timezone.utc).date()
+    if question.day != utc_today:
+        if ctx.now.astimezone(CAIRO_TZ).hour < LC_DAILY_RETRY_UNTIL_CAIRO_HOUR:
+            return None, True, ""
+        return None, False, f"LeetCode daily is for {question.day} (UTC today is {utc_today}); no LeetCode daily tasks created"
+    return question, False, ""
 
 
 def _skip_overdue_practice(repo: Repo, today: date) -> int:
     skipped = 0
     for task in repo.rows(S.DB_TASKS):
-        if get_select(task, S.P_Tasks.TYPE) != "Topic Practice" or get_select(task, S.P_Tasks.ORIGIN) != "Auto":
+        auto_practice = get_select(task, S.P_Tasks.TYPE) == "Topic Practice" and get_select(task, S.P_Tasks.ORIGIN) == "Auto"
+        if not (auto_practice or is_lc_daily_task(task)):
             continue
         if get_status(task, S.P_Tasks.STATUS) not in OPEN_PRACTICE_STATUSES:
             continue
@@ -218,8 +263,32 @@ def _create_practice_task(
     props[S.P_Tasks.TARGET] = nt.p_number(len(picks))
     props[S.P_Tasks.LINKS] = nt.p_text("\n".join(f"{p['key']} | {p['link']}" for p in picks))
     children = [_bullet(f"{p['key']} — {p['name']} (rating {p['rating']}) — {p['link']}") for p in picks]
-    repo.create(S.DB_TASKS, props, children=children)
+    repo.create(S.DB_TASKS, props, children=children, icon=icons.icon_for(S.DB_TASKS, props))
     return 1, ""
+
+
+def _create_lc_daily_task(ctx: Context, member: Member, question: Any, today: date) -> int:
+    """One "💡 LeetCode daily" task for a member (keyed by LeetCode's date). Returns 1 when created."""
+    repo = ctx.repo
+    key = f"{S.LC_DAILY_SOURCE_PREFIX}{question.day.isoformat()}:{member.id}"
+    if repo.find(S.DB_TASKS, S.P_Tasks.SOURCE_KEY, key) is not None:
+        return 0
+    notes = " · ".join(part for part in (question.difficulty or "difficulty unknown", ", ".join(question.topic_names)) if part)
+    props = member_task_props(
+        member,
+        title=f"💡 LeetCode daily: {question.title}",
+        task_type="Custom",
+        status="To Do",
+        due=cairo_end_of_day(today),
+        origin="Auto",
+        source_key=key,
+    )
+    props[S.P_Tasks.PRIORITY] = nt.p_select("Medium")
+    props[S.P_Tasks.TARGET] = nt.p_number(1)
+    props[S.P_Tasks.LINKS] = nt.p_text(f"{question.problem_key} | {question.link}")
+    props[S.P_Tasks.NOTES] = nt.p_text(notes)
+    repo.create(S.DB_TASKS, props, icon=icons.icon_for(S.DB_TASKS, props))
+    return 1
 
 
 def _upsolve_pct(entry: dict) -> int:
@@ -313,6 +382,6 @@ def _create_upsolve_tasks(ctx: Context, member: Member, today: date) -> int:
         props[S.P_Tasks.CONTEST_ENTRY] = nt.p_relation([entry["id"]])
         if contest is not None:
             props[S.P_Tasks.CONTEST] = nt.p_relation([contest["id"]])
-        repo.create(S.DB_TASKS, props)
+        repo.create(S.DB_TASKS, props, icon=icons.icon_for(S.DB_TASKS, props))
         made += 1
     return made

@@ -32,6 +32,7 @@ from datetime import date, datetime, time, timedelta
 from typing import Any
 
 from hq import config
+from hq import icons
 from hq import notion as nt
 from hq import schema as S
 from hq.config import num
@@ -400,7 +401,7 @@ def _ensure_report(
     }
     # The body goes in as children at create time (Notion takes at most 100 per request);
     # anything beyond that is appended.
-    report = repo.create(S.DB_WEEKLY_REPORTS, props, children=body[:MAX_CREATE_CHILDREN])
+    report = repo.create(S.DB_WEEKLY_REPORTS, props, children=body[:MAX_CREATE_CHILDREN], icon=icons.icon_for(S.DB_WEEKLY_REPORTS, props))
     repo.append(report["id"], body[MAX_CREATE_CHILDREN:])
     admin = str(ctx.cfg.get(K.ADMIN_USER_ID) or "").strip()
     text = f"Weekly report ready for the week of {week_begin.isoformat()}. "
@@ -531,7 +532,7 @@ def _upsert_summary(
         S.P_WeeklySummary.TEAM: nt.p_relation([team_id] if team_id else []),
         S.P_WeeklySummary.REPORT: nt.p_relation([report_id] if report_id else []),
     }
-    repo.upsert(S.DB_WEEKLY_SUMMARY, S.P_WeeklySummary.SOURCE_KEY, key, props)
+    repo.upsert(S.DB_WEEKLY_SUMMARY, S.P_WeeklySummary.SOURCE_KEY, key, props, icon=icons.icon_for(S.DB_WEEKLY_SUMMARY, props))
 
 
 def _award_mvp(repo: Repo, member: Member, week_begin: date, label: str, summary: dict[str, Any]) -> None:
@@ -539,16 +540,14 @@ def _award_mvp(repo: Repo, member: Member, week_begin: date, label: str, summary
     if repo.find(S.DB_ACHIEVEMENTS, S.P_Achievements.SOURCE_KEY, key) is not None:
         return
     friday = week_begin + timedelta(days=6)
-    repo.create(
-        S.DB_ACHIEVEMENTS,
-        {
-            S.P_Achievements.TITLE: nt.p_title(f"{MVP_BADGE} · {member.name} · {label}"),
-            S.P_Achievements.WHO: nt.p_select(member.name),
-            S.P_Achievements.MEMBER: nt.p_relation([member.id]),
-            S.P_Achievements.BADGE: nt.p_select(MVP_BADGE),
-            S.P_Achievements.TIER: nt.p_select("Gold"),
-            S.P_Achievements.EARNED_ON: nt.p_date(friday, with_time=False),
-            S.P_Achievements.DETAIL: nt.p_text(f"MVP of the week of {label} with {summary['points']} points"),
-            S.P_Achievements.SOURCE_KEY: nt.p_text(key),
-        },
-    )
+    props = {
+        S.P_Achievements.TITLE: nt.p_title(f"{MVP_BADGE} · {member.name} · {label}"),
+        S.P_Achievements.WHO: nt.p_select(member.name),
+        S.P_Achievements.MEMBER: nt.p_relation([member.id]),
+        S.P_Achievements.BADGE: nt.p_select(MVP_BADGE),
+        S.P_Achievements.TIER: nt.p_select("Gold"),
+        S.P_Achievements.EARNED_ON: nt.p_date(friday, with_time=False),
+        S.P_Achievements.DETAIL: nt.p_text(f"MVP of the week of {label} with {summary['points']} points"),
+        S.P_Achievements.SOURCE_KEY: nt.p_text(key),
+    }
+    repo.create(S.DB_ACHIEVEMENTS, props, icon=icons.icon_for(S.DB_ACHIEVEMENTS, props))

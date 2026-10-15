@@ -20,6 +20,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
+from hq import icons
 from hq import notion as nt
 from hq import schema as S
 from hq.config import num
@@ -198,7 +199,7 @@ def build_dashboard(ctx: Context, member: Member) -> str:
     """Create one member's dashboard page and its views. Returns the page URL."""
     repo = ctx.repo
     title = f"👤 {member.name} · Dashboard"
-    page = repo.create_child_page(DASHBOARD_PARENT_PAGE_ID, title, [_header(member.name)])
+    page = repo.create_child_page(DASHBOARD_PARENT_PAGE_ID, title, [_header(member.name)], icon=icons.ui("member"))
     url = page.get("url") or ""
     # The URL is written before any view is created: a view failure must never leave the
     # member without a Dashboard URL, or the next run would create a duplicate page.

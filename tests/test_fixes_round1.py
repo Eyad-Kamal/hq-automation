@@ -16,7 +16,7 @@ from hq.notion import Notion, NotionError
 from hq.repo import Repo, get_checkbox, get_date, get_number, get_relation, get_select, get_status, get_text, get_title
 from hq.sources import atcoder, codeforces
 from hq.timeutil import CAIRO_TZ
-from tests.fakes import NOW, NOW_SATURDAY, build_world, contest, hours_from_now, seed_eyad_solves
+from tests.fakes import NOW, NOW_SATURDAY, build_world, contest, enable_practice, hours_from_now, seed_eyad_solves
 from tests.helpers import FakeResponse, FakeSession
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -176,6 +176,7 @@ def test_F1_recompute_counts_one_contest_entry_per_contest_and_member() -> None:
 # ---------------------------------------------------------------------------
 def test_F2_daily_member_failure_is_isolated_and_state_is_set(monkeypatch) -> None:
     w = build_world()
+    enable_practice(w)
     w.sources.problemset = [{"key": "CF-1000B", "name": "Bee", "link": "https://x", "rating": 1000, "tags": ["greedy"]}]
     onboard.run(w.context())
     original = daily._create_upsolve_tasks
@@ -361,6 +362,7 @@ def _strings_problem(w) -> None:
 
 def test_F6_competent_topic_is_skipped_for_the_next_topic(monkeypatch) -> None:
     w = build_world()
+    enable_practice(w)
     w.sources.problemset = [{"key": "CF-1000B", "name": "Bee", "link": "https://x", "rating": 1000, "tags": ["greedy"]}]
     _strings_problem(w)
     onboard.run(w.context())

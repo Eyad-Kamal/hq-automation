@@ -118,6 +118,10 @@ class LiveSources:
             return leetcode.fetch_solves_or_none(self.session, username, since)
         return leetcode.fetch_solves(self.session, username, since) or []
 
+    def lc_daily_question(self):
+        """LeetCode's daily challenge (``leetcode.DailyQuestion``), or None when it cannot be read."""
+        return leetcode.fetch_daily_question_or_none(self.session)
+
 
 def parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(prog="python -m hq.main", description="MUST CPC Training HQ automation")

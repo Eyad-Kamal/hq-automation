@@ -47,6 +47,7 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from hq import config
+from hq import icons
 from hq import notion as nt
 from hq import schema as S
 from hq.config import num
@@ -237,7 +238,7 @@ def _create(ctx: Context, stats: ImportStats, db: str, props: dict[str, Any], ou
         outcome.incomplete = True
         return None
     stats.creates += 1
-    return ctx.repo.create(db, props)
+    return ctx.repo.create(db, props, icon=icons.icon_for(db, props))
 
 
 def _entry_index(repo: Repo) -> dict[tuple[str, str], dict]:

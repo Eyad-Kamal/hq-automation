@@ -96,6 +96,7 @@ def _contest(w, name: str, start: datetime, duration: int, ext: str) -> str:
 # ---------------------------------------------------------------------------
 def test_1_learning_rows_are_the_only_candidates_when_any_exist() -> None:
     w = build_world()
+    _config(w, "AUTO_PRACTICE_TASKS", 1)
     _problemset(w)
     onboard.run(w.context())
     _set_lq(w, "strings", w.eyad, **{S.P_LearningQueue.QUEUE_STATUS: nt.p_status("Learning")})
@@ -108,6 +109,7 @@ def test_1_learning_rows_are_the_only_candidates_when_any_exist() -> None:
 
 def test_1_queued_fallback_is_not_used_when_learning_topics_have_no_problems() -> None:
     w = build_world()
+    _config(w, "AUTO_PRACTICE_TASKS", 1)
     _problemset(w)
     onboard.run(w.context())  # greedy is Queued and has problems; strings is Learning and has none in its band
     _set_lq(w, "strings", w.eyad, **{S.P_LearningQueue.QUEUE_STATUS: nt.p_status("Learning")})
@@ -120,6 +122,7 @@ def test_1_queued_fallback_is_not_used_when_learning_topics_have_no_problems() -
 
 def test_1_learning_topic_widens_its_band_like_autotasks() -> None:
     w = build_world()
+    _config(w, "AUTO_PRACTICE_TASKS", 1)
     _problemset(w)
     onboard.run(w.context())
     _set_lq(w, "strings", w.eyad, **{S.P_LearningQueue.QUEUE_STATUS: nt.p_status("Learning")})
@@ -210,7 +213,7 @@ def test_2_window_is_a_config_value() -> None:
 
 
 def test_2_defaults_are_in_config() -> None:
-    assert config.DEFAULTS["UPSOLVE_WINDOW_DAYS"] == 14
+    assert config.DEFAULTS["UPSOLVE_WINDOW_DAYS"] == 7  # round 3: was 14
     assert config.DEFAULTS["DAILY_LOG_DAYS"] == 60
     assert config.DEFAULTS["WEEKLY_BACKFILL_WEEKS"] == 12
     assert config.DEFAULTS["DASHBOARDS_AUTO"] == 1

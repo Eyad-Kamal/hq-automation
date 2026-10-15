@@ -5,7 +5,7 @@ runs on GitHub every 10 minutes and does the work Notion cannot do by itself:
 
 - imports accepted solutions and rating changes from Codeforces, AtCoder and LeetCode;
 - computes points, streaks, freezes, mastery tiers, goal progress, achievements and team totals;
-- creates daily practice tasks, upsolve reminders and contest tasks;
+- creates a daily LeetCode task for each trainee, upsolve reminders and contest tasks (topic practice tasks are assigned by coaches; see `AUTO_PRACTICE_TASKS` below);
 - posts contest reminders (a Notion comment that mentions the participants, plus optional email);
 - writes the Saturday weekly summaries, the MVP and the weekly report page.
 
@@ -133,8 +133,8 @@ trainee looks back `IMPORT_BACKFILL_DAYS` days (120 by default). Later imports a
    Div. 3 and ABC; L2 adds Div. 2 and Educational; L3 and L4 add more). Edit it at any time.
 4. Within about 10 minutes the trainee gets their learning-queue rows, a daily target and
    contest subscriptions. Their first import runs within about 25 minutes.
-5. The first daily practice task is created once per Cairo day, so a trainee added during the
-   day gets it the next day. To get it now, run the workflow with **Job** set to `daily`.
+5. The first daily task (the LeetCode daily, and topic practice when `AUTO_PRACTICE_TASKS` is 1) is created
+   once per Cairo day, so a trainee added during the day gets it the next day. To get it now, run the workflow with **Job** set to `daily`.
    Tasks for the same day are not duplicated.
 
 To take someone out, untick **Active**. Their history stays.
@@ -155,7 +155,10 @@ Do not delete rows. The important ones:
 | `LC_EASY` / `LC_MEDIUM` / `LC_HARD` | 1000 / 1400 / 1900 | Rating used for LeetCode difficulty |
 | `MODE_UPSOLVE` / `MODE_EDITORIAL` | 0.7 / 0.5 | Score multipliers for upsolved and editorial-assisted problems |
 | `IMPORT_MAX_CREATES` | 400 | Most new rows one import run may create. The rest is imported by later runs, so a large first backfill takes several runs |
-| `UPSOLVE_WINDOW_DAYS` | 14 | Upsolve reminders only for contests that ended within this many days. Older open auto Upsolve tasks become Skipped |
+| `UPSOLVE_WINDOW_DAYS` | 7 | Upsolve reminders only for contests that ended within this many days. Older open auto Upsolve tasks become Skipped |
+| `AUTO_PRACTICE_TASKS` | 0 | 1 = create the automatic daily Topic Practice task for each trainee (picked from the learning queue). 0 = off: coaches assign topic practice. Existing auto practice tasks are still skipped when overdue |
+| `LEETCODE_DAILY_TASKS` | 1 | 1 = create one "💡 LeetCode daily" task per active trainee for LeetCode's daily challenge. It becomes Done when the trainee solves that problem. 0 = off |
+| `ICON_BACKFILL_PER_RUN` | 100 | Most empty row icons set per run (the icons are real logos where one exists, otherwise emoji). Icons the user set are never replaced. 0 = off for existing rows; new rows still get their icon |
 | `DAILY_LOG_DAYS` | 60 | Daily Log days recomputed per member (back from today) |
 | `WEEKLY_BACKFILL_WEEKS` | 12 | Complete past weeks whose Weekly Summary rows are kept filled (no reports or MVP for older weeks) |
 | `DASHBOARDS_AUTO` | 1 | 1 = create a personal dashboard page for each active member with an empty Dashboard URL. 0 = off |
@@ -183,8 +186,9 @@ Every run (every 10 minutes) does, in order:
 2. **contests**: updates the contest list from all three platforms, and creates contest tasks.
 3. **alerts**: posts reminders for contests starting within `ALERT_MINUTES` (+10 minutes of slack).
 4. **imports + recompute**: only when the last import was more than 25 minutes ago. Each trainee's import starts 2 days before their last successful sync (or looks back `IMPORT_BACKFILL_DAYS` for a first import). A trainee whose source failed keeps the old sync date, so nothing is skipped.
-5. **daily**: only once per Cairo day. Creates today's practice tasks and upsolve reminders, and
-   marks yesterday's unfinished practice tasks as Skipped.
+5. **daily**: only once per Cairo day. Creates today's LeetCode daily task and upsolve reminders (and
+   topic practice tasks when `AUTO_PRACTICE_TASKS` is 1), and marks yesterday's unfinished auto tasks
+   (practice and LeetCode daily) as Skipped.
 6. **weekly**: only after Saturday 00:10 (Cairo time), once per week.
 
 Every job can run any number of times. Each record has a stable key, so reruns update or skip
@@ -226,6 +230,17 @@ Common messages:
   outside the import window, can be missed.
 - **Sync Log volume.** A row is written only when a job changed something or ended with a Warning or Error, so
   the log stays small. A bad week can still produce many rows; use a filter in the Sync Log view if needed.
+- **LeetCode daily.** The task uses LeetCode's `activeDailyCodingChallengeQuestion` GraphQL field, an
+  unofficial endpoint. The day is compared with the UTC day, on the assumption that LeetCode's daily
+  changes at UTC midnight (about 02:00 to 03:00 in Cairo). This assumption is not verified here. Until
+  the question for the current UTC day appears, the daily job is retried on the next run (before 06:00
+  Cairo); after that a Warning is written and no task is created.
+- **Cumulative Points.** The Daily Log needs a Number property named `Cumulative Points`. It is the running
+  total of points from solves that have a Solved On date; a solve without a date is not in any day.
+- **Icons.** New rows get their icon when a job creates them. Existing rows are filled in by the auto run
+  (up to `ICON_BACKFILL_PER_RUN` per run), except Sync Log rows, which get an icon only when created.
+  Personal dashboard pages get their icon only when created. Icons are Notion external images (judge
+  logos from `hq/icons.json`) or emoji. Whether Notion accepts each emoji in the list is not verified here.
 - **Keep-alive.** The `keepalive` workflow commits a timestamp on the 1st of every month, so
   GitHub does not switch off the schedule after 60 days of no activity.
 

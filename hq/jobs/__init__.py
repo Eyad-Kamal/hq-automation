@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, time, timezone
 from typing import Any
 
+from hq import icons
 from hq import notion as nt
 from hq import schema as S
 from hq.repo import Member, Repo
@@ -115,7 +116,7 @@ def write_sync_log(ctx: Context, job: str, started: datetime, result: JobResult)
         S.P_SyncLog.DETAILS: nt.p_text(result.details[:MAX_DETAILS]),
     }
     try:
-        ctx.repo.create(S.DB_SYNC_LOG, props)
+        ctx.repo.create(S.DB_SYNC_LOG, props, icon=icons.icon_for(S.DB_SYNC_LOG, props))
     except Exception:  # noqa: BLE001 - a log write must never fail the run
         log.exception("could not write the Sync Log row for %s", job)
 

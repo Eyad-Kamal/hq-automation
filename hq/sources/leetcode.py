@@ -12,7 +12,8 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterable
-from datetime import datetime, timezone
+from dataclasses import dataclass
+from datetime import date, datetime, timezone
 from typing import Any
 
 import requests
@@ -73,14 +74,19 @@ def map_tags(names: Iterable[str]) -> tuple[str, ...]:
     return tuple(seen)
 
 
-def _graphql(session: requests.Session, query: str, variables: dict[str, Any] | None = None) -> dict[str, Any] | None:
+def _graphql(
+    session: requests.Session,
+    query: str,
+    variables: dict[str, Any] | None = None,
+    headers: dict[str, str] | None = None,
+) -> dict[str, Any] | None:
     """POST one GraphQL query. Returns ``data`` or None (logged) on any failure."""
     body = get_json(
         session,
         "POST",
         GRAPHQL_URL,
         json_body={"query": query, "variables": variables or {}},
-        headers={"Content-Type": "application/json", "Referer": "https://leetcode.com"},
+        headers={"Content-Type": "application/json", "Referer": "https://leetcode.com", **(headers or {})},
     )
     if not isinstance(body, dict):
         return None
@@ -89,6 +95,69 @@ def _graphql(session: requests.Session, query: str, variables: dict[str, Any] | 
         return None
     data = body.get("data")
     return data if isinstance(data, dict) else None
+
+
+DAILY_QUERY = "query { activeDailyCodingChallengeQuestion { date link question { title titleSlug difficulty topicTags { name } } } }"
+# LeetCode may refuse non-browser clients for this query, so it is sent with a browser-like User-Agent.
+BROWSER_USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+)
+
+
+@dataclass(frozen=True)
+class DailyQuestion:
+    """LeetCode's daily challenge: the date it is for, and the problem."""
+
+    day: date
+    title: str
+    slug: str
+    difficulty: str | None
+    topic_names: tuple[str, ...]  # LeetCode's own topic names, as published
+
+    @property
+    def problem_key(self) -> str:
+        return f"LC-{self.slug}"
+
+    @property
+    def link(self) -> str:
+        return f"https://leetcode.com/problems/{self.slug}/"
+
+
+@guarded(lambda: None)
+def fetch_daily_question_or_none(session: requests.Session) -> DailyQuestion | None:
+    """Today's LeetCode daily challenge, or None when it cannot be read (logged).
+
+    Live shape: {"data": {"activeDailyCodingChallengeQuestion": {"date": "YYYY-MM-DD",
+    "link": "/problems/<slug>/", "question": {"title", "titleSlug", "difficulty",
+    "topicTags": [{"name"}, ...]}}}}.
+    """
+    data = _graphql(session, DAILY_QUERY, headers={"User-Agent": BROWSER_USER_AGENT})
+    if data is None:
+        return None
+    daily = data.get("activeDailyCodingChallengeQuestion")
+    question = daily.get("question") if isinstance(daily, dict) else None
+    if not isinstance(question, dict):
+        log.warning("LeetCode daily: no question in the response")
+        return None
+    title = str(question.get("title") or "").strip()
+    slug = str(question.get("titleSlug") or "").strip()
+    try:
+        day = date.fromisoformat(str(daily.get("date")))
+    except (TypeError, ValueError):
+        log.warning("LeetCode daily: unreadable date %r", daily.get("date"))
+        return None
+    if not title or not slug:
+        log.warning("LeetCode daily: title or slug is missing")
+        return None
+    difficulty = question.get("difficulty")
+    names = tuple(str(t.get("name")) for t in question.get("topicTags") or [] if isinstance(t, dict) and t.get("name"))
+    return DailyQuestion(
+        day=day,
+        title=title,
+        slug=slug,
+        difficulty=difficulty if difficulty in _DIFFICULTIES else None,
+        topic_names=names,
+    )
 
 
 @guarded(list)
