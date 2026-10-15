@@ -69,8 +69,10 @@ class Report:
     failures: list[str] = field(default_factory=list)
 
 
-def _who(name: str) -> dict[str, Any]:
-    return {"property": S.P_Problems.WHO, "select": {"equals": name}}
+def _mine(prop: str, member_id: str) -> dict[str, Any]:
+    """Rows whose relation ``prop`` links to the member's page. A relation exists on every
+    database a view uses, unlike a Who select option, which Notion only lists once written."""
+    return {"property": prop, "relation": {"contains": member_id}}
 
 
 def _and(*filters: dict[str, Any]) -> dict[str, Any]:
@@ -96,15 +98,15 @@ def _line_chart(
             "group_by": x_group,
             "hide_empty_groups": False,
             "start_day_of_week": 1,
+            "sort": {"type": "ascending"},  # required by the API for a date x axis
         },
         "y_axis": y_axis,
     }
 
 
-def _views(name: str, ids: dict[str, dict[str, str]]) -> list[_View]:
-    who = _who(name)
+def _views(member_id: str, name: str, ids: dict[str, dict[str, str]]) -> list[_View]:
     open_tasks = _and(
-        who,
+        _mine(S.P_Tasks.ASSIGNEE, member_id),
         {"property": S.P_Tasks.STATUS, "status": {"does_not_equal": "Done"}},
         {"property": S.P_Tasks.STATUS, "status": {"does_not_equal": "Skipped"}},
         {"property": S.P_Tasks.STATUS, "status": {"does_not_equal": "Missed"}},
@@ -120,7 +122,7 @@ def _views(name: str, ids: dict[str, dict[str, str]]) -> list[_View]:
             "Daily points",
             S.DB_DAILY_LOG,
             "chart",
-            who,
+            _mine(S.P_DailyLog.MEMBER, member_id),
             [{"property": S.P_DailyLog.DATE, "direction": "ascending"}],
             daily,
         ),
@@ -128,7 +130,7 @@ def _views(name: str, ids: dict[str, dict[str, str]]) -> list[_View]:
             "Weekly points",
             S.DB_WEEKLY_SUMMARY,
             "chart",
-            _and(who, {"property": S.P_WeeklySummary.SCOPE, "select": {"equals": "Person"}}),
+            _and(_mine(S.P_WeeklySummary.MEMBER, member_id), {"property": S.P_WeeklySummary.SCOPE, "select": {"equals": "Person"}}),
             [{"property": S.P_WeeklySummary.WEEK_START, "direction": "ascending"}],
             weekly,
         ),
@@ -136,20 +138,20 @@ def _views(name: str, ids: dict[str, dict[str, str]]) -> list[_View]:
             "Rating history",
             S.DB_RATING_HISTORY,
             "chart",
-            who,
+            _mine(S.P_RatingHistory.MEMBER, member_id),
             [{"property": S.P_RatingHistory.DATE, "direction": "ascending"}],
             rating,
         ),
-        _View("Learning Queue", S.DB_LEARNING_QUEUE, "board", who, board_group=S.P_LearningQueue.QUEUE_STATUS),
+        _View("Learning Queue", S.DB_LEARNING_QUEUE, "board", _mine(S.P_LearningQueue.MEMBER, member_id), board_group=S.P_LearningQueue.QUEUE_STATUS),
         _View(
             "Problems",
             S.DB_PROBLEMS,
             "table",
-            who,
+            _mine(S.P_Problems.MEMBER, member_id),
             [{"property": S.P_Problems.SOLVED_ON, "direction": "descending"}],
         ),
-        _View("Goals", S.DB_GOALS, "table", who),
-        _View("Achievements", S.DB_ACHIEVEMENTS, "gallery", who),
+        _View("Goals", S.DB_GOALS, "table", _mine(S.P_Goals.MEMBER, member_id)),
+        _View("Achievements", S.DB_ACHIEVEMENTS, "gallery", _mine(S.P_Achievements.MEMBER, member_id)),
     ]
 
 
@@ -172,7 +174,7 @@ def _property_ids(repo: Repo) -> dict[str, dict[str, str]]:
 
 def _header(name: str) -> dict[str, Any]:
     text = (
-        f"Dashboard for {name}. Every view is filtered to Who = {name}. "
+        f"Dashboard for {name}. Every view shows the rows linked to {name}. "
         "Daily and weekly charts cover the history kept in Daily Log and Weekly Summary."
     )
     return {
@@ -257,7 +259,7 @@ def build_dashboard(ctx: Context, member: Member, report: Report, ids: dict[str,
     # member without a Dashboard URL, or the next run would create a duplicate page.
     if url:
         repo.update(S.DB_MEMBERS, member.page, {S.P_Members.DASHBOARD: nt.p_url(url)})
-    for view in _views(member.name, ids):
+    for view in _views(member.id, member.name, ids):
         if _attempt(repo, view, page["id"], member, report):
             report.views += 1
     return url
@@ -301,7 +303,7 @@ def _repair_dashboard(ctx: Context, member: Member, ids: dict[str, dict[str, str
     if page_id is None:
         report.failures.append(f"{member.name} / repair: the Dashboard URL is not a Notion page link")
         return
-    views = _views(member.name, ids)
+    views = _views(member.id, member.name, ids)
     found = _present_views(repo.block_children(page_id), views)
     for view in views:
         if view.db in found:

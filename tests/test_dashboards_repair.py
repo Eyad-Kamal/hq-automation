@@ -4,6 +4,8 @@ capped, idempotent), and Notion error text in the job details. Offline (FakeNoti
 from __future__ import annotations
 
 from hq import main as cli
+from hq import notion as nt
+from hq.notion import NotionError
 from hq import schema as S
 from hq.jobs import OK, WARNING, dashboards
 from hq.jobs import onboard
@@ -75,7 +77,7 @@ def test_repair_creates_only_the_missing_view_and_is_idempotent() -> None:
     assert len(_views_named(w, "Goals")) == 3  # Goals for Eyad and Sara, plus Eyad's repaired one
     repaired = w.notion.views[-1]
     assert repaired["name"] == "Goals"
-    assert repaired["filter"] == {"property": "Who", "select": {"equals": "Eyad"}}
+    assert repaired["filter"] == {"property": "Member", "relation": {"contains": w.eyad}}, "Goals is filtered by the member relation"
 
     again = dashboards.run(w.context(), repair_now=True)
     assert again.items == 0
@@ -113,13 +115,13 @@ def test_repair_attempts_each_missing_view_at_most_once_per_pass() -> None:
 
 
 def test_present_views_reads_linked_view_blocks_by_database_title() -> None:
-    views = dashboards._views("Eyad", {})
+    views = dashboards._views("member-eyad", "Eyad", {})
     children = [{"type": "child_database", "child_database": {"title": S.DB_LEARNING_QUEUE}}]
     assert dashboards._present_views(children, views) == {S.DB_LEARNING_QUEUE}
 
 
 def test_present_views_reads_marker_paragraphs() -> None:
-    views = dashboards._views("Eyad", {})
+    views = dashboards._views("member-eyad", "Eyad", {})
     children = [dashboards._marker(S.DB_GOALS), {"type": "callout", "callout": {}}]
     assert dashboards._present_views(children, views) == {S.DB_GOALS}
 
@@ -128,3 +130,66 @@ def test_dashboards_job_runs_after_recompute_and_daily_in_the_auto_sequence() ->
     w = build_world()
     names = [r.job for r in cli.run_auto(w.context(now=NOW))]
     assert names.index("dashboards") > names.index("daily") > names.index("recompute")
+
+
+def test_every_view_filters_on_the_member_relation_never_on_who() -> None:
+    views = {v.name: v for v in dashboards._views("member-x", "X", {})}
+    for view in views.values():
+        assert '"Who"' not in str(view.filter), view.name
+    assert views["Tasks (open)"].filter["and"][0] == {"property": "Assignee", "relation": {"contains": "member-x"}}
+    assert views["Problems"].filter == {"property": "Member", "relation": {"contains": "member-x"}}
+    assert views["Goals"].filter == {"property": "Member", "relation": {"contains": "member-x"}}
+    assert views["Weekly points"].filter["and"][0] == {"property": "Member", "relation": {"contains": "member-x"}}
+
+
+def test_every_chart_view_is_created_with_an_x_axis_sort() -> None:
+    w = build_world()
+    # the fake reads property ids from existing rows, so each chart database needs one row
+    w.notion.seed(S.DB_DAILY_LOG, {S.P_DailyLog.TITLE: nt.p_title("d"), S.P_DailyLog.DATE: nt.p_date(NOW.date(), with_time=False), S.P_DailyLog.POINTS: nt.p_number(1)})
+    w.notion.seed(S.DB_WEEKLY_SUMMARY, {S.P_WeeklySummary.TITLE: nt.p_title("w"), S.P_WeeklySummary.WEEK_START: nt.p_date(NOW.date(), with_time=False), S.P_WeeklySummary.POINTS: nt.p_number(1)})
+    w.notion.seed(S.DB_RATING_HISTORY, {S.P_RatingHistory.TITLE: nt.p_title("r"), S.P_RatingHistory.DATE: nt.p_date(NOW.date(), with_time=False), S.P_RatingHistory.NEW: nt.p_number(1000)})
+    onboard.run(w.context())
+    dashboards.run(w.context())
+    charts = [v for v in w.notion.views if v["type"] == "chart"]
+    assert len(charts) == 6, "daily, weekly and rating charts for each of the two active members"
+    for chart in charts:
+        assert chart["configuration"]["x_axis"]["sort"] == {"type": "ascending"}, chart["name"]
+
+
+def test_repair_adds_the_missing_tasks_and_rating_views_and_nothing_else() -> None:
+    w = build_world()
+    onboard.run(w.context())
+    dashboards.run(w.context())
+    page_id = _page_id(w, w.eyad)
+    _remove_markers(w, page_id, S.DB_TASKS)
+    _remove_markers(w, page_id, S.DB_RATING_HISTORY)
+    total = len(w.notion.views)
+    result = dashboards.run(w.context(), repair_now=True)
+    assert result.items == 2
+    assert sorted(v["name"] for v in w.notion.views[total:]) == ["Rating history", "Tasks (open)"]
+
+
+def test_onboard_counts_icon_backfill_as_items_and_reports_it() -> None:
+    w = build_world()
+    w.notion.seed(S.DB_PROBLEMS, {S.P_Problems.TITLE: nt.p_title("p"), S.P_Problems.JUDGE: nt.p_select("Codeforces")})
+    result = onboard.run(w.context())
+    assert "icons backfilled:" in result.details
+    assert "Problems 1" in result.details
+    assert result.items >= 1, "icon writes count as items, so they reach the Sync Log"
+
+
+def test_icon_write_errors_are_reported_with_the_notion_message(monkeypatch) -> None:
+    w = build_world()
+    w.notion.seed(S.DB_PROBLEMS, {S.P_Problems.TITLE: nt.p_title("p"), S.P_Problems.JUDGE: nt.p_select("Codeforces")})
+    original = w.notion.update_page
+
+    def refuse_icons(page_id, properties=None, *, icon=None):
+        if icon is not None:
+            raise NotionError("PATCH /pages -> HTTP 400: icon not allowed here")
+        return original(page_id, properties, icon=icon)
+
+    monkeypatch.setattr(w.notion, "update_page", refuse_icons)
+    result = onboard.run(w.context())
+    assert result.result == WARNING
+    assert "icon write Problems: NotionError" in result.details
+    assert "icon not allowed here" in result.details

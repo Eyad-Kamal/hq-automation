@@ -71,7 +71,7 @@ def test_round3_config_defaults_and_keys() -> None:
     assert config.DEFAULTS["AUTO_PRACTICE_TASKS"] == 0
     assert config.DEFAULTS["UPSOLVE_WINDOW_DAYS"] == 7
     assert config.DEFAULTS["LEETCODE_DAILY_TASKS"] == 1
-    assert config.DEFAULTS["ICON_BACKFILL_PER_RUN"] == 100
+    assert config.DEFAULTS["ICON_BACKFILL_PER_RUN"] == 300
     for key in ("AUTO_PRACTICE_TASKS", "LEETCODE_DAILY_TASKS", "ICON_BACKFILL_PER_RUN"):
         assert getattr(S.ConfigKey, key) == key
         assert key in config.DEFAULTS
@@ -474,13 +474,17 @@ def test_backfill_fills_empty_icons_only_and_respects_the_cap() -> None:
     w.notion.reset_writes()
 
     repo = Repo(w.notion, w.ids)
-    assert icons.backfill(repo, config.load(repo)) == 2
-    assert [w.notion.page(p)["icon"] is not None for p in problems] == [True, True, False]
+    first = icons.backfill(repo, config.load(repo))
+    assert first.total == 2
+    assert first.set_by_db[S.DB_PROBLEMS] == 1, "round-robin: one row per database in turn"
+    assert [w.notion.page(p)["icon"] is not None for p in problems] == [True, False, False]
     assert w.notion.page(user)["icon"] == {"type": "emoji", "emoji": "🦄"}, "a user's icon is never replaced"
 
     repo2 = Repo(w.notion, w.ids)
-    assert icons.backfill(repo2, config.load(repo2)) == 2
-    assert w.notion.page(problems[2])["icon"] == icons.judge("Codeforces")
+    second = icons.backfill(repo2, config.load(repo2))
+    assert second.set_by_db[S.DB_PROBLEMS] == 1, "the next run moves on to the next row"
+    assert [w.notion.page(p)["icon"] is not None for p in problems] == [True, True, False]
+    assert second.remaining[S.DB_PROBLEMS] == 1, "the report says what is still empty"
     assert w.notion.page(user)["icon"] == {"type": "emoji", "emoji": "🦄"}
 
 
@@ -489,7 +493,7 @@ def test_backfill_dry_run_records_but_does_not_write() -> None:
     w.notion.seed(S.DB_PROBLEMS, {S.P_Problems.TITLE: nt.p_title("p"), S.P_Problems.JUDGE: nt.p_select("AtCoder")})
     w.notion.reset_writes()
     repo = Repo(w.notion, w.ids, dry_run=True)
-    assert icons.backfill(repo, config.load(repo)) >= 1
+    assert icons.backfill(repo, config.load(repo)).total >= 1
     assert w.notion.icon_updates == []
     assert any(line.startswith("icon ") for line in repo.write_log)
 

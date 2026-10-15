@@ -24,6 +24,7 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import Mapping
+from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -173,25 +174,61 @@ def daily_log_state(repo: Any, page: Mapping[str, Any], *, active: bool, frozen:
     return True
 
 
-def backfill(repo: Any, cfg: Mapping[str, Any]) -> int:
-    """Set icons on up to ``ICON_BACKFILL_PER_RUN`` rows whose icon is empty. Returns the number set."""
+@dataclass
+class BackfillReport:
+    """What one backfill pass did. ``remaining`` counts rows still without an icon after the pass."""
+
+    set_by_db: dict[str, int] = field(default_factory=dict)
+    remaining: dict[str, int] = field(default_factory=dict)
+    errors: list[str] = field(default_factory=list)
+
+    @property
+    def total(self) -> int:
+        return sum(self.set_by_db.values())
+
+
+ICON_ERROR_CHARS = 200
+MAX_ICON_ERRORS = 5
+
+
+def backfill(repo: Any, cfg: Mapping[str, Any]) -> BackfillReport:
+    """Set icons on up to ``ICON_BACKFILL_PER_RUN`` rows whose icon is empty.
+
+    Round-robin: one row from each database in turn, so no single table (Daily Log, say)
+    takes the whole budget. A failed write uses up one attempt and is recorded in ``errors``
+    (the first few, truncated), so the run goes on and the cause is visible in the Sync Log."""
+    report = BackfillReport()
     cap = int(num(dict(cfg), K.ICON_BACKFILL_PER_RUN))
-    if cap <= 0:
-        return 0
-    done = 0
+    queues: dict[str, list[tuple[Any, Json]]] = {}
     for db in BACKFILL_DBS:
-        if done >= cap:
-            break
-        for page in repo.rows(db):
+        report.set_by_db[db] = 0
+        todo: list[tuple[Any, Json]] = []
+        if cap > 0:
+            for page in repo.rows(db):
+                if page.get("icon"):
+                    continue
+                icon = icon_for(db, page.get("properties") or {})
+                if icon is not None:
+                    todo.append((page, icon))
+        queues[db] = todo
+    done = 0
+    while cap > 0 and done < cap and any(queues.values()):
+        for db in BACKFILL_DBS:
             if done >= cap:
                 break
-            if page.get("icon"):
+            if not queues[db]:
                 continue
-            icon = icon_for(db, page.get("properties") or {})
-            if icon is None:
-                continue
-            repo.set_icon(db, page, icon)
+            page, icon = queues[db].pop(0)
             done += 1
-    if done:
-        log.info("icons: %d row icon(s) set", done)
-    return done
+            try:
+                repo.set_icon(db, page, icon)
+            except Exception as exc:  # noqa: BLE001 - keep going; the error is reported below
+                log.warning("icon write failed for %s: %s", db, exc)
+                if len(report.errors) < MAX_ICON_ERRORS:
+                    report.errors.append(f"{db}: {type(exc).__name__}: {str(exc)[:ICON_ERROR_CHARS]}")
+                continue
+            report.set_by_db[db] += 1
+    report.remaining = {db: len(queues[db]) for db in BACKFILL_DBS}
+    if report.total:
+        log.info("icons: %d row icon(s) set", report.total)
+    return report

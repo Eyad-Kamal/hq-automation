@@ -60,23 +60,27 @@ def run(ctx: Context) -> JobResult:
             log.exception("onboard failed for %s", member.name)
             failures.append(f"{member.name}: {type(exc).__name__}: {exc}")
 
-    # Row icons (ICON_BACKFILL_PER_RUN rows per run). Icon writes are not counted as items, so a
-    # quiet run with only icon work writes no Sync Log row.
-    icon_writes = 0
+    # Row icons: up to ICON_BACKFILL_PER_RUN empty icons per run, round-robin over the databases.
+    # Icon writes count as items, so the Sync Log shows them (and the errors behind any failures).
+    icon_line = "row icons: not run"
     try:
-        icon_writes = icons.backfill(repo, ctx.cfg)
+        icon_report = icons.backfill(repo, ctx.cfg)
+        by_db = ", ".join(f"{db} {n}" for db, n in icon_report.set_by_db.items() if n)
+        icon_line = f"icons backfilled: {icon_report.total}" + (f" ({by_db})" if by_db else "")
+        left = {db: n for db, n in icon_report.remaining.items() if n}
+        icon_line += "; still without an icon: " + (", ".join(f"{db} {n}" for db, n in left.items()) or "none")
+        failures.extend(f"icon write {err}" for err in icon_report.errors)
     except Exception as exc:  # noqa: BLE001 - icons are cosmetic; they must not fail the job
         log.exception("row icon backfill failed")
-        failures.append(f"icon backfill: {type(exc).__name__}: {exc}")
+        failures.append(f"icon backfill: {type(exc).__name__}: {str(exc)[:200]}")
     details = [
         f"members checked: {len(members)}",
         f"learning queue rows created: {queue_rows}",
-        f"row icons set: {icon_writes}",
+        icon_line,
         *(f"FAILED {line}" for line in failures),
     ]
     result = WARNING if failures else OK
-    items = repo.writes - writes_before - icon_writes
-    return JobResult(job=JOB, result=result, items=items, details="\n".join(details))
+    return JobResult(job=JOB, result=result, items=repo.writes - writes_before, details="\n".join(details))
 
 
 def _onboard_member(ctx: Context, member, topics, pairs: set) -> int:
