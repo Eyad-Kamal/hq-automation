@@ -519,14 +519,24 @@ class Repo:
             return {}
         return self.notion.create_comment(page_id, rich_text)
 
-    def append(self, page_id: str, children: list[Json]) -> None:
+    def append(self, page_id: str, children: list[Json]) -> list[Json]:
+        """Append blocks to a page. Returns the created block objects (empty in dry-run)."""
         if not children:
-            return
+            return []
         self.writes += 1
         if self.dry_run:
             self._record(f"append {len(children)} blocks to {page_id}")
+            return []
+        resp = self.notion.append_blocks(page_id, children)
+        return list(resp.get("results") or [])
+
+    def delete_block(self, block_id: str) -> None:
+        """Delete (archive) one block the job created and no longer needs."""
+        self.writes += 1
+        if self.dry_run:
+            self._record(f"delete block {block_id}")
             return
-        self.notion.append_blocks(page_id, children)
+        self.notion.delete_block(block_id)
 
     def _record(self, message: str) -> None:
         self.write_log.append(message)

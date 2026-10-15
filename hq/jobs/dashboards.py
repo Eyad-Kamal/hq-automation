@@ -2,30 +2,48 @@
 views filtered to that member (Config DASHBOARDS_AUTO, default 1).
 
 For each active member whose Members "Dashboard" URL is empty, the page
-"👤 <Name> · Dashboard" is created under the Members page. It holds a header callout and
-linked views (``create_database`` on the Views API, Notion-Version 2026-03-11):
+"👤 <Name> · Dashboard" is created under the Members page. It holds a header callout, then one
+block group per view:
 
-* Tasks (open), Problems (newest first), Goals and Achievements, each filtered to Who = name;
-* Daily points, Weekly points (Scope = Person) and Rating history as line charts;
-* Learning Queue as a board grouped by Queue Status.
+* a callout with the view's emoji, its bold name and a one-line description (gray marker
+  paragraph after it, see below);
+* the linked view itself, created inside that callout (``create_database`` on the Views API,
+  Notion-Version 2026-03-11), so every view sits in its own callout.
 
-Every view filters on Who = name. Notion lists a name as an option of a Who select only once a
-job has written it, so the job runs after recompute and daily (see ``hq.main.run_auto``). A view
-the API still rejects is retried by the repair pass, which runs once per Cairo day, right after a
-recompute, or on a forced run. The repair pass finds the views already on a page by the marker
-paragraph each created view leaves (``hq-view: <database title>``) and by the database title of
-linked-view blocks; it creates only the missing views, once each per member per pass.
+The views are: Tasks (open), Problems (newest first), Goals and Achievements, each filtered to the
+member's relation; Daily points, Weekly points (Scope = Person) and Rating history as line charts;
+Learning Queue as a board grouped by Queue Status. Every view filters on the Member/Assignee
+relation, never on the Who select.
 
-A chart or board that the API rejects (HTTP 400) is created as a table with the same filter.
+Fallbacks, tried in order for each view (only a 4xx answer moves on; a 5xx or a network error
+stops at once, because the view may already exist and a second create would duplicate it):
+
+1. the callout as the parent (``block_id``); if refused, the same configuration with the page as
+   the parent (``page_id``), logged as a warning;
+2. a chart is first sent with its caption (``caption`` and ``show_caption``, the caption being the
+   view's description); if refused, the chart is sent without the caption fields;
+3. a chart or board that is still refused is created as a table with the same filter.
+
+Each view leaves a gray marker paragraph on the page top level (``hq-view: <database title>``)
+right after it is created. The repair pass finds the views already on a page by those markers and
+by the database title of linked-view blocks; it creates only the missing views, once each per
+member per pass. A view that could not be created has its empty callout deleted again.
+
+Notion lists a name as an option of a Who select only once a job has written it, so the job runs
+after recompute and daily (see ``hq.main.run_auto``). A view the API still rejects is retried by
+the repair pass, which runs once per Cairo day, right after a recompute, or on a forced run.
 Every failed view is reported with its Notion error text (truncated) in the job details.
 The Dashboard URL is written right after the page is created, so a member gets one dashboard.
+
+The Views API field names for the block parent and the chart caption are not verified against
+the live API; the fallbacks above are what keeps a rejected field from losing the view.
 """
 
 from __future__ import annotations
 
 import logging
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 from urllib.parse import urlparse
 
@@ -59,6 +77,8 @@ class _View:
     sorts: list[dict[str, Any]] = field(default_factory=list)
     chart: dict[str, Any] | None = None  # chart configuration without the "type" key
     board_group: str | None = None  # Status property to group a board by
+    icon: str = "📌"  # emoji of the callout that holds the view
+    blurb: str = ""  # one-line description; the callout text after the bold name, and a chart's caption
 
 
 @dataclass
@@ -117,7 +137,15 @@ def _views(member_id: str, name: str, ids: dict[str, dict[str, str]]) -> list[_V
     )
     rating = _line_chart(S.P_RatingHistory.DATE, "day", S.P_RatingHistory.NEW, "max", ids.get(S.DB_RATING_HISTORY, {}))
     return [
-        _View("Tasks (open)", S.DB_TASKS, "table", open_tasks, [{"property": S.P_Tasks.DUE, "direction": "ascending"}]),
+        _View(
+            "Tasks (open)",
+            S.DB_TASKS,
+            "table",
+            open_tasks,
+            [{"property": S.P_Tasks.DUE, "direction": "ascending"}],
+            icon="✅",
+            blurb="your open tasks, earliest due first",
+        ),
         _View(
             "Daily points",
             S.DB_DAILY_LOG,
@@ -125,6 +153,8 @@ def _views(member_id: str, name: str, ids: dict[str, dict[str, str]]) -> list[_V
             _mine(S.P_DailyLog.MEMBER, member_id),
             [{"property": S.P_DailyLog.DATE, "direction": "ascending"}],
             daily,
+            icon="📈",
+            blurb="your points per day, from Daily Log",
         ),
         _View(
             "Weekly points",
@@ -133,6 +163,8 @@ def _views(member_id: str, name: str, ids: dict[str, dict[str, str]]) -> list[_V
             _and(_mine(S.P_WeeklySummary.MEMBER, member_id), {"property": S.P_WeeklySummary.SCOPE, "select": {"equals": "Person"}}),
             [{"property": S.P_WeeklySummary.WEEK_START, "direction": "ascending"}],
             weekly,
+            icon="📅",
+            blurb="your points per week, from Weekly Summary",
         ),
         _View(
             "Rating history",
@@ -141,17 +173,36 @@ def _views(member_id: str, name: str, ids: dict[str, dict[str, str]]) -> list[_V
             _mine(S.P_RatingHistory.MEMBER, member_id),
             [{"property": S.P_RatingHistory.DATE, "direction": "ascending"}],
             rating,
+            icon="🏅",
+            blurb="your rating over time, the highest rating of each day",
         ),
-        _View("Learning Queue", S.DB_LEARNING_QUEUE, "board", _mine(S.P_LearningQueue.MEMBER, member_id), board_group=S.P_LearningQueue.QUEUE_STATUS),
+        _View(
+            "Learning Queue",
+            S.DB_LEARNING_QUEUE,
+            "board",
+            _mine(S.P_LearningQueue.MEMBER, member_id),
+            board_group=S.P_LearningQueue.QUEUE_STATUS,
+            icon="🧠",
+            blurb="your learning items, grouped by queue status",
+        ),
         _View(
             "Problems",
             S.DB_PROBLEMS,
             "table",
             _mine(S.P_Problems.MEMBER, member_id),
             [{"property": S.P_Problems.SOLVED_ON, "direction": "descending"}],
+            icon="🧩",
+            blurb="the problems you solved, newest first",
         ),
-        _View("Goals", S.DB_GOALS, "table", _mine(S.P_Goals.MEMBER, member_id)),
-        _View("Achievements", S.DB_ACHIEVEMENTS, "gallery", _mine(S.P_Achievements.MEMBER, member_id)),
+        _View("Goals", S.DB_GOALS, "table", _mine(S.P_Goals.MEMBER, member_id), icon="🎯", blurb="your goals"),
+        _View(
+            "Achievements",
+            S.DB_ACHIEVEMENTS,
+            "gallery",
+            _mine(S.P_Achievements.MEMBER, member_id),
+            icon="🏆",
+            blurb="your achievements",
+        ),
     ]
 
 
@@ -193,12 +244,25 @@ def _marker(db: str) -> dict[str, Any]:
     }
 
 
-def _view_body(view: _View, page_id: str, repo: Repo, configuration: dict[str, Any] | None) -> dict[str, Any]:
+def _callout(view: _View) -> dict[str, Any]:
+    """The callout that holds one view: its emoji, the bold view name and a one-line description."""
+    rich = [
+        {"type": "text", "text": {"content": view.name}, "annotations": {"bold": True}},
+        {"type": "text", "text": {"content": f" — {view.blurb}"}},
+    ]
+    return {
+        "object": "block",
+        "type": "callout",
+        "callout": {"icon": {"type": "emoji", "emoji": view.icon}, "rich_text": rich},
+    }
+
+
+def _view_body(view: _View, ds_id: str, parent: dict[str, Any], configuration: dict[str, Any] | None) -> dict[str, Any]:
     body: dict[str, Any] = {
         "name": view.name,
         "type": view.type,
-        "data_source_id": repo.ds(view.db),
-        "create_database": {"parent": {"type": "page_id", "page_id": page_id}},
+        "data_source_id": ds_id,
+        "create_database": {"parent": parent},
         "filter": view.filter,
     }
     if view.sorts:
@@ -208,29 +272,89 @@ def _view_body(view: _View, page_id: str, repo: Repo, configuration: dict[str, A
     return body
 
 
-def _create_view(repo: Repo, view: _View, page_id: str, member_name: str) -> None:
-    """Create one linked view. A chart or board the API rejects becomes a table. Raises
-    NotionError with both messages when the table fallback fails too."""
-    try:
-        if view.type == "chart":
-            if view.chart is None:
-                raise NotionError("chart property ids are missing")
-            repo.create_view(_view_body(view, page_id, repo, {"type": "chart", **view.chart}))
-        elif view.type == "board":
-            if view.board_group is None:
-                raise NotionError("board group property is missing")
-            group = {"type": "status", "property_id": view.board_group}
-            repo.create_view(_view_body(view, page_id, repo, {"type": "board", "group_by": group}))
-        else:
-            repo.create_view(_view_body(view, page_id, repo, None))
-    except NotionError as exc:
-        log.warning("view %s for %s created as a table instead: %s", view.name, member_name, exc)
-        table = _view_body(view, page_id, repo, {"type": "table"})
-        table["type"] = "table"
+def _is_rejection(exc: NotionError) -> bool:
+    """True when the API refused the request (a 4xx other than 429), so nothing was created and
+    another parent or configuration may be tried. A 5xx, a 429 or a network error may have stored
+    the view already, so those are never retried here."""
+    status = exc.status
+    return status is not None and 400 <= status < 500 and status != 429
+
+
+def _preferred(view: _View) -> list[tuple[str | None, dict[str, Any] | None]] | None:
+    """Configurations to try for the view's own type, in order, as (label, configuration).
+    None when the view cannot be configured (its property ids are unknown)."""
+    if view.type == "chart":
+        if view.chart is None:
+            return None
+        captioned = {"type": "chart", **view.chart, "caption": view.blurb, "show_caption": True}
+        return [("the chart with its caption", captioned), ("the chart without its caption", {"type": "chart", **view.chart})]
+    if view.type == "board":
+        if view.board_group is None:
+            return None
+        return [(None, {"type": "board", "group_by": {"type": "status", "property_id": view.board_group}})]
+    return [(None, None)]
+
+
+def _ladder(
+    repo: Repo,
+    view: _View,
+    page_id: str,
+    callout_id: str | None,
+    member_name: str,
+    configurations: list[tuple[str | None, dict[str, Any] | None]],
+) -> None:
+    """Create the view: for each configuration, first with the callout as the parent, then with
+    the page as the parent. Only a refusal (4xx) moves on; anything else is raised at once."""
+    refused: NotionError | None = None
+    for index, (label, configuration) in enumerate(configurations):
+        if index > 0:
+            log.warning("view %s for %s: retrying with %s", view.name, member_name, label)
+        for kind in ("block", "page"):
+            if kind == "block":
+                if callout_id is None:
+                    continue  # dry-run: no callout was created, so there is no block to use
+                parent = {"type": "block_id", "block_id": callout_id}
+            else:
+                parent = {"type": "page_id", "page_id": page_id}
+            try:
+                repo.create_view(_view_body(view, repo.ds(view.db), parent, configuration))
+                return
+            except NotionError as exc:
+                if not _is_rejection(exc):
+                    raise
+                refused = exc
+                if kind == "block":
+                    log.warning(
+                        "view %s for %s: the block parent was refused, retrying with the page parent: %s",
+                        view.name,
+                        member_name,
+                        _error_text(exc),
+                    )
+    if refused is None:  # unreachable: every configuration tries at least the page parent
+        raise NotionError(f"view {view.name} was not attempted")
+    raise refused
+
+
+def _create_view(repo: Repo, view: _View, page_id: str, callout_id: str | None, member_name: str) -> None:
+    """Create one linked view inside its callout. A chart or board the API refuses becomes a table
+    with the same filter. Raises NotionError with both messages when the table fallback fails too."""
+    configurations = _preferred(view)
+    if configurations is not None:
         try:
-            repo.create_view(table)
-        except NotionError as exc2:
-            raise NotionError(f"{exc}; the table fallback also failed: {exc2}") from exc2
+            _ladder(repo, view, page_id, callout_id, member_name, configurations)
+            return
+        except NotionError as exc:
+            if not _is_rejection(exc):
+                raise
+            reason: NotionError = exc
+    else:
+        reason = NotionError(f"{view.type} property ids are missing")
+    log.warning("view %s for %s created as a table instead: %s", view.name, member_name, reason)
+    table = replace(view, type="table")
+    try:
+        _ladder(repo, table, page_id, callout_id, member_name, [(None, {"type": "table"})])
+    except NotionError as exc2:
+        raise NotionError(f"{reason}; the table fallback also failed: {exc2}") from exc2
 
 
 def _error_text(exc: BaseException) -> str:
@@ -238,13 +362,22 @@ def _error_text(exc: BaseException) -> str:
 
 
 def _attempt(repo: Repo, view: _View, page_id: str, member: Member, report: Report) -> bool:
-    """Create one view and its marker. A failure is recorded in ``report``; returns success."""
+    """Create one view: its callout, the view inside it, then the marker. A failure is recorded in
+    ``report`` and the empty callout is deleted again; returns success."""
+    callout_id: str | None = None
     try:
-        _create_view(repo, view, page_id, member.name)
+        created = repo.append(page_id, [_callout(view)])
+        callout_id = str(created[0]["id"]) if created and created[0].get("id") else None
+        _create_view(repo, view, page_id, callout_id, member.name)
         repo.append(page_id, [_marker(view.db)])
     except Exception as exc:  # noqa: BLE001 - one view must not stop the others or the dashboard
         log.warning("view %s for %s was not created: %s", view.name, member.name, _error_text(exc))
         report.failures.append(f"{member.name} / view {view.name}: {_error_text(exc)}")
+        if callout_id is not None:
+            try:
+                repo.delete_block(callout_id)
+            except Exception as cleanup:  # noqa: BLE001 - the empty callout is only tidiness
+                log.warning("empty callout of view %s for %s was not deleted: %s", view.name, member.name, cleanup)
         return False
     return True
 

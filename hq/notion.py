@@ -40,7 +40,14 @@ Json = dict[str, Any]
 
 
 class NotionError(RuntimeError):
-    """A Notion API call failed after retries, or returned a non-retryable error."""
+    """A Notion API call failed after retries, or returned a non-retryable error.
+
+    ``status`` is the HTTP status code when the API answered, else None (network errors and
+    retries that ran out)."""
+
+    def __init__(self, message: str, *, status: int | None = None) -> None:
+        super().__init__(message)
+        self.status = status
 
 
 # ---------------------------------------------------------------------------
@@ -127,17 +134,17 @@ class Notion:
                 if 200 <= code < 300:
                     return _decode(resp)
                 if code == 429 and _error_code(resp) == BLOCKED_CODE:
-                    raise NotionError(f"{method} {path} -> HTTP 429 {BLOCKED_CODE}: not retried")
+                    raise NotionError(f"{method} {path} -> HTTP 429 {BLOCKED_CODE}: not retried", status=429)
                 if code == 429 or code == 529:
                     last_error = f"HTTP {code}"
                     wait = self._retry_wait(resp, attempt)
                 elif code >= 500:
                     if not retry_server_errors:
-                        raise NotionError(f"{method} {path} -> HTTP {code} (not retried): {resp.text[:500]}")
+                        raise NotionError(f"{method} {path} -> HTTP {code} (not retried): {resp.text[:500]}", status=code)
                     last_error = f"HTTP {code}"
                     wait = self._retry_wait(resp, attempt)
                 else:
-                    raise NotionError(f"{method} {path} -> HTTP {code}: {resp.text[:500]}")
+                    raise NotionError(f"{method} {path} -> HTTP {code}: {resp.text[:500]}", status=code)
             else:
                 wait = float(min(60, 2**attempt))
 
@@ -211,6 +218,10 @@ class Notion:
         """Create a database view, e.g. a linked view on a page (``create_database``). Views
         in the chart configuration need Notion-Version 2026-03-11 (see hq.jobs.dashboards)."""
         return self._call("POST", "/views", body=body, retry_server_errors=False, version=VIEWS_VERSION)
+
+    def delete_block(self, block_id: str) -> Json:
+        """Delete (archive) a block, e.g. an empty dashboard callout whose view was not created."""
+        return self._call("DELETE", f"/blocks/{block_id}")
 
     def block_children(self, block_id: str, page_size: int = 100) -> list[Json]:
         """The first page of child blocks of a page (``page_size=1`` to test emptiness)."""

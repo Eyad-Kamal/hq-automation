@@ -44,6 +44,8 @@ class FakeNotion:
         self.icon_updates: list[tuple[str, dict[str, Any]]] = []  # (page id, icon) for icon-only patches
         self.views: list[dict[str, Any]] = []
         self.view_faults: set[str] = set()  # view types the fake rejects with HTTP 400
+        self.deleted_blocks: list[str] = []
+        self._nb = 0  # block id counter for appended blocks
         self._n = 0
 
     # -- Notion client surface ------------------------------------------------
@@ -92,8 +94,18 @@ class FakeNotion:
 
     def append_blocks(self, page_id: str, children: Any) -> dict[str, Any]:
         self.appends.append((page_id, copy.deepcopy(list(children))))
-        self.blocks.setdefault(page_id, []).extend(copy.deepcopy(list(children)))
-        return {}
+        stored = []
+        for child in children:
+            self._nb += 1
+            stored.append({"id": f"blk-{self._nb:05d}", **copy.deepcopy(child)})
+        self.blocks.setdefault(page_id, []).extend(stored)
+        return {"object": "list", "results": [{"id": b["id"], "object": "block"} for b in stored]}
+
+    def delete_block(self, block_id: str) -> dict[str, Any]:
+        self.deleted_blocks.append(block_id)
+        for page_id, blocks in self.blocks.items():
+            self.blocks[page_id] = [b for b in blocks if b.get("id") != block_id]
+        return {"id": block_id, "archived": True}
 
     def create_comment(self, page_id: str, rich_text: list[dict[str, Any]]) -> dict[str, Any]:
         self.comments.append((page_id, copy.deepcopy(rich_text)))
@@ -116,13 +128,12 @@ class FakeNotion:
         return {"id": page_id, "url": f"https://www.notion.so/Dashboard-{page_id}"}
 
     def create_view(self, body: dict[str, Any]) -> dict[str, Any]:
-        if "*" in self.view_faults:
-            from hq.notion import NotionError as _NE
+        from hq.notion import NotionError as _NE
 
-            raise _NE("POST /views -> HTTP 500 (injected)")
+        if "*" in self.view_faults:
+            raise _NE("POST /views -> HTTP 500 (injected)", status=500)
         if self.view_faults and body.get("type") in self.view_faults:
-            from hq.notion import NotionError as _NE
-            raise _NE("POST /views -> HTTP 400 (injected)")
+            raise _NE("POST /views -> HTTP 400 (injected)", status=400)
         self.views.append(copy.deepcopy(body))
         return {"id": f"view-{len(self.views)}"}
 

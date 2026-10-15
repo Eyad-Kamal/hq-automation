@@ -564,7 +564,7 @@ def test_7_onboard_creates_one_dashboard_per_active_member_with_filtered_views()
     assert titles == ["👤 Eyad · Dashboard", "👤 Sara · Dashboard"], "inactive members get none"
     assert get_url(w.notion.page(w.eyad), S.P_Members.DASHBOARD), "the Dashboard URL is stored"
     eyad_views = [v for v in w.notion.views if v["name"] in ("Tasks (open)", "Problems", "Goals", "Achievements")]
-    assert eyad_views and all(v["create_database"]["parent"]["page_id"] for v in eyad_views)
+    assert eyad_views and all(v["create_database"]["parent"]["type"] == "block_id" for v in eyad_views), "each view sits in its callout"
     problems = [v for v in w.notion.views if v["name"] == "Problems"]
     assert problems[0]["filter"] == {"property": "Member", "relation": {"contains": w.eyad}}, "views filter on the member relation, not Who"
     assert all(v["filter"] != {"property": "Who", "select": {"equals": "Eyad"}} for v in w.notion.views)

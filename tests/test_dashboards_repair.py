@@ -3,6 +3,8 @@ capped, idempotent), and Notion error text in the job details. Offline (FakeNoti
 
 from __future__ import annotations
 
+import logging
+
 from hq import main as cli
 from hq import notion as nt
 from hq.notion import NotionError
@@ -193,3 +195,108 @@ def test_icon_write_errors_are_reported_with_the_notion_message(monkeypatch) -> 
     assert result.result == WARNING
     assert "icon write Problems: NotionError" in result.details
     assert "icon not allowed here" in result.details
+
+
+def _callouts(w, page_id: str) -> list[dict]:
+    return [b for b in w.notion.blocks.get(page_id, []) if b.get("type") == "callout"]
+
+
+def _seed_chart_rows(w) -> None:
+    # the fake reads property ids from existing rows, so each chart database needs one row
+    w.notion.seed(S.DB_DAILY_LOG, {S.P_DailyLog.TITLE: nt.p_title("d"), S.P_DailyLog.DATE: nt.p_date(NOW.date(), with_time=False), S.P_DailyLog.POINTS: nt.p_number(1)})
+    w.notion.seed(S.DB_WEEKLY_SUMMARY, {S.P_WeeklySummary.TITLE: nt.p_title("w"), S.P_WeeklySummary.WEEK_START: nt.p_date(NOW.date(), with_time=False), S.P_WeeklySummary.POINTS: nt.p_number(1)})
+    w.notion.seed(S.DB_RATING_HISTORY, {S.P_RatingHistory.TITLE: nt.p_title("r"), S.P_RatingHistory.DATE: nt.p_date(NOW.date(), with_time=False), S.P_RatingHistory.NEW: nt.p_number(1000)})
+
+
+def test_each_view_sits_in_its_own_callout_with_an_emoji_and_a_description() -> None:
+    w = build_world()
+    onboard.run(w.context())
+    dashboards.run(w.context())
+    page_id = _page_id(w, w.eyad)
+    callouts = _callouts(w, page_id)
+    assert len(callouts) == 9, "the header callout and one callout per view"
+    view_callouts = callouts[1:]
+    assert [c["callout"]["icon"]["emoji"] for c in view_callouts] == ["✅", "📈", "📅", "🏅", "🧠", "🧩", "🎯", "🏆"]
+    for block in view_callouts:
+        rich = block["callout"]["rich_text"]
+        assert rich[0]["annotations"]["bold"] is True and rich[1]["text"]["content"].startswith(" — ")
+        assert "color" not in block["callout"], "default colour"
+    view_callout_ids = {c["id"] for pid in (page_id, _page_id(w, w.sara)) for c in _callouts(w, pid)[1:]}
+    parents = [v["create_database"]["parent"] for v in w.notion.views]
+    assert all(p["type"] == "block_id" for p in parents), "the Views API accepted the block parent in the fake"
+    assert {p["block_id"] for p in parents} == view_callout_ids, "each view is parented to its own callout"
+    again = dashboards.run(w.context(), repair_now=True)
+    assert again.items == 0, "the markers still show every view, so repair finds nothing missing"
+
+
+def test_a_refused_block_parent_is_retried_with_the_page_parent(monkeypatch, caplog) -> None:
+    w = build_world()
+    onboard.run(w.context())
+    original = w.notion.create_view
+
+    def refuse_block_parents(body):
+        if body["create_database"]["parent"]["type"] == "block_id":
+            raise NotionError("POST /views -> HTTP 400: block parent not allowed", status=400)
+        return original(body)
+
+    monkeypatch.setattr(w.notion, "create_view", refuse_block_parents)
+    with caplog.at_level(logging.WARNING, logger="hq.jobs.dashboards"):
+        result = dashboards.run(w.context())
+    assert result.result == OK
+    assert len(w.notion.views) == 16
+    eyad_page = _page_id(w, w.eyad)
+    assert all(v["create_database"]["parent"] == {"type": "page_id", "page_id": eyad_page} for v in _views_named(w, "Goals") if v["filter"]["relation"]["contains"] == w.eyad)
+    assert "block parent was refused" in caplog.text
+
+
+def test_a_server_error_is_reported_and_never_retried_with_another_parent(monkeypatch) -> None:
+    w = build_world()
+    onboard.run(w.context())
+    attempts: list[str] = []
+
+    def fail_with_500(body):
+        attempts.append(body["create_database"]["parent"]["type"])
+        raise NotionError("POST /views -> HTTP 500 (injected)", status=500)
+
+    monkeypatch.setattr(w.notion, "create_view", fail_with_500)
+    result = dashboards.run(w.context())
+    assert result.result == WARNING
+    assert attempts == ["block_id"] * 16, "one attempt per view, no page-parent retry, no table"
+    assert "HTTP 500 (injected)" in result.details
+    assert w.notion.views == []
+    assert len(w.notion.deleted_blocks) == 16, "the empty callouts of the failed views are deleted again"
+
+
+def test_a_chart_is_sent_with_its_caption_then_without_it_when_refused(monkeypatch) -> None:
+    w = build_world()
+    _seed_chart_rows(w)
+    onboard.run(w.context())
+    original = w.notion.create_view
+    sent_with_caption: list[str] = []
+
+    def refuse_captions(body):
+        if "caption" in (body.get("configuration") or {}):
+            sent_with_caption.append(body["name"])
+            raise NotionError("POST /views -> HTTP 400: caption not allowed", status=400)
+        return original(body)
+
+    monkeypatch.setattr(w.notion, "create_view", refuse_captions)
+    dashboards.run(w.context())
+    assert len(sent_with_caption) == 12, "each chart tried its caption, with both parents, before it was dropped"
+    charts = [v for v in w.notion.views if v["type"] == "chart"]
+    assert len(charts) == 6 and all(c["configuration"]["type"] == "chart" for c in charts), "no table fallback"
+    assert all("caption" not in c["configuration"] and "show_caption" not in c["configuration"] for c in charts)
+
+
+def test_charts_carry_a_caption_equal_to_their_description() -> None:
+    w = build_world()
+    _seed_chart_rows(w)
+    onboard.run(w.context())
+    dashboards.run(w.context())
+    blurbs = {v.name: v.blurb for v in dashboards._views("member-x", "X", {})}
+    charts = [v for v in w.notion.views if v["type"] == "chart"]
+    assert len(charts) == 6
+    for chart in charts:
+        assert chart["configuration"]["show_caption"] is True
+        assert chart["configuration"]["caption"] == blurbs[chart["name"]]
+    assert all(v["type"] != "chart" or "caption" in v["configuration"] for v in w.notion.views)
