@@ -44,6 +44,9 @@ _RULES: dict[str, list[Rule]] = {
     "Stretch 1200": [
         Rule("max_rating_solved", 1200, "Bronze", "Solve a problem rated 1200 or higher")
     ],
+    "Stretch 1400": [
+        Rule("max_rating_solved", 1400, "Silver", "Solve a problem rated 1400 or higher (Specialist level)")
+    ],
     "Stretch 1600": [
         Rule("max_rating_solved", 1600, "Silver", "Solve a problem rated 1600 or higher")
     ],

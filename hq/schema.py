@@ -670,6 +670,7 @@ BADGES: tuple[str, ...] = (
     "Iron Habit (30🔥)",
     "Unbreakable (100🔥)",
     "Stretch 1200",
+    "Stretch 1400",
     "Stretch 1600",
     "Stretch 2000",
     "Topic Mastered",

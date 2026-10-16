@@ -66,4 +66,4 @@ def test_option_values_match_spec() -> None:
     assert schema.Judge.CF_GYM == "CF Gym"
     assert "dp" in schema.CF_TAGS and "2-sat" in schema.CF_TAGS
     assert len(schema.CF_TAGS) == len(set(schema.CF_TAGS)) == 37
-    assert len(schema.BADGES) == 23
+    assert len(schema.BADGES) == 24

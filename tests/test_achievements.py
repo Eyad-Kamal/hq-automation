@@ -4,7 +4,7 @@ from hq.logic import achievements
 SPEC_BADGES = {
     "First Blood", "Century (100)", "250 Club", "500 Club", "1000 Club",
     "Week Warrior (7🔥)", "Iron Habit (30🔥)", "Unbreakable (100🔥)",
-    "Stretch 1200", "Stretch 1600", "Stretch 2000",
+    "Stretch 1200", "Stretch 1400", "Stretch 1600", "Stretch 2000",
     "Topic Mastered", "Level Complete",
     "Pupil Reached", "Specialist Reached", "Expert Reached", "CM Reached",
     "Weekly MVP", "Contest Regular", "Upsolve Hero", "Template Smith",
@@ -68,6 +68,14 @@ def test_stretch_thresholds_are_cumulative():
     assert tier_of(result, "Stretch 1200") == "Bronze"
     assert tier_of(result, "Stretch 1600") == "Silver"
     assert "Stretch 2000" not in names(result)
+
+
+def test_stretch_1400_awards_at_1400_not_1399():
+    result = achievements.evaluate({"max_rating_solved": 1400}, set())
+    assert tier_of(result, "Stretch 1400") == "Silver"
+    assert tier_of(result, "Stretch 1200") == "Bronze"
+    assert "Stretch 1600" not in names(result)
+    assert "Stretch 1400" not in names(achievements.evaluate({"max_rating_solved": 1399}, set()))
 
 
 def test_stretch_2000_is_gold():
