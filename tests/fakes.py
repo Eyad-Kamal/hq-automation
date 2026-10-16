@@ -45,6 +45,7 @@ class FakeNotion:
         self.views: list[dict[str, Any]] = []
         self.view_faults: set[str] = set()  # view types the fake rejects with HTTP 400
         self.deleted_blocks: list[str] = []
+        self.declared: dict[str, set[str]] = {}  # ds id -> property names the schema declares (even with no row yet)
         self._nb = 0  # block id counter for appended blocks
         self._n = 0
 
@@ -113,7 +114,7 @@ class FakeNotion:
 
     def retrieve_data_source(self, ds_id: str) -> dict[str, Any]:
         # Property ids are the name with a prefix; enough for the dashboard code under test.
-        names: set[str] = set()
+        names: set[str] = set(self.declared.get(ds_id, set()))
         for row in self.tables.get(ds_id, []):
             names.update(row.get("properties", {}).keys())
         return {"id": ds_id, "properties": {n: {"id": f"id-{n}", "type": "x"} for n in sorted(names)}}
@@ -393,6 +394,8 @@ def build_world(*, subscriptions: list[str] | None = None) -> World:
             S.P_Members.LEVEL: nt.p_relation([level1]),
         },
     )
+    # The Problems schema has "Auto Topics" (recompute writes it); tests that need it missing drop it.
+    notion.declared.setdefault(notion.ids[S.DB_PROBLEMS], set()).add(S.P_Problems.AUTO_TOPICS)
     notion.reset_writes()
     # Every real CF handle has a user.info row (unrated users have null ratings).
     sources.cf_info["sara_cf"] = {"rating": None, "maxRating": None}

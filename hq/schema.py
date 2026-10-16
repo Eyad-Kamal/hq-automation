@@ -209,6 +209,7 @@ class P_Problems:
     # relations
     MEMBER = "Member"
     TOPICS = "Topics"
+    AUTO_TOPICS = "Auto Topics"  # rich text: comma-separated Topic ids the script last wrote to Topics (see recompute)
     # synced
     CONTEST_ENTRY = "Contest Entry"  # from Contest Entries."Problems"
     # formulas
@@ -611,6 +612,7 @@ class ConfigKey:
     TITLE_FIX_PER_RUN = "TITLE_FIX_PER_RUN"  # most old emoji title prefixes removed per run (onboard job)
     SEASON_START = "SEASON_START"  # Config "Date" (or Value YYYY-MM-DD): global season start; empty = no season
     SEASON_FLAG_PER_RUN = "SEASON_FLAG_PER_RUN"  # most In Season checkboxes written per recompute run
+    TOPIC_ROUTE_PER_RUN = "TOPIC_ROUTE_PER_RUN"  # most Problems rows whose Topics recompute rewrites per run
 
 
 # Source Key prefix of the automatic "LeetCode daily" task: "lcdaily:<date>:<member id>".

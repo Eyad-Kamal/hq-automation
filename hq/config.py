@@ -74,6 +74,7 @@ DEFAULTS: dict[str, Any] = {
     "ADMIN_USER_ID": "",
     "SEASON_START": None,  # a date, or None = no season (see _season_start)
     "SEASON_FLAG_PER_RUN": 400,
+    "TOPIC_ROUTE_PER_RUN": 300,
 }
 
 _ISO_DAY = re.compile(r"\d{4}-\d{2}-\d{2}")

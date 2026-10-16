@@ -163,6 +163,7 @@ Do not delete rows. The important ones:
 | `DAILY_LOG_DAYS` | 60 | Daily Log days recomputed per member (back from today) |
 | `SEASON_START` | empty (no season) | Not a number: set its **Date** (or Value as `YYYY-MM-DD`). The season starts that day. See [Seasons](#seasons-start-from-0-without-deleting-anything) |
 | `SEASON_FLAG_PER_RUN` | 400 | Most "In Season" checkboxes one recompute run writes. The rest follow on later runs |
+| `TOPIC_ROUTE_PER_RUN` | 300 | Most Problems rows whose Topics recompute rewrites per run. Same-band topics are filled in roadmap order (the earlier topic reaches Competent first). Rows you edit by hand are never rewritten. 0 = no rewrites |
 | `WEEKLY_BACKFILL_WEEKS` | 12 | Complete past weeks whose Weekly Summary rows are kept filled (no reports or MVP for older weeks) |
 | `DASHBOARDS_AUTO` | 1 | 1 = create a personal dashboard page for each active member with an empty Dashboard URL. 0 = off |
 | `FREEZE_EVERY` / `FREEZE_MAX` | 7 / 2 | A freeze is earned per 7 active days, up to 2 |

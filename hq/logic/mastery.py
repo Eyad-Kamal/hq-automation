@@ -86,6 +86,26 @@ def mode_factor(mode: str | None, cfg: Mapping[str, float] | None = None) -> flo
     return 1.0
 
 
+def solve_points(
+    rating: int,
+    band_low: int,
+    band_high: int,
+    mode: str | None,
+    cfg: Mapping[str, float] | None = None,
+) -> float:
+    """Points of one solve for one topic: band factor times mode factor (unrounded).
+
+    ``rating`` is the effective rating. This is the per-solve term ``compute`` sums.
+    """
+    if rating < band_low:
+        band_factor = _cfg_value(cfg, "BAND_BELOW_FACTOR")
+    elif rating > band_high:
+        band_factor = _cfg_value(cfg, "BAND_ABOVE_FACTOR")
+    else:
+        band_factor = _cfg_value(cfg, "BAND_IN_FACTOR")
+    return band_factor * mode_factor(mode, cfg)
+
+
 def tier_for(
     points: float,
     above: int,
@@ -120,10 +140,6 @@ def compute(
     ``solves`` is an iterable of ``(rating, mode)`` pairs. ``rating`` should be
     the effective rating (see ``scoring.effective_rating``).
     """
-    below_factor = _cfg_value(cfg, "BAND_BELOW_FACTOR")
-    in_factor = _cfg_value(cfg, "BAND_IN_FACTOR")
-    above_factor = _cfg_value(cfg, "BAND_ABOVE_FACTOR")
-
     count = 0
     below = 0
     in_band = 0
@@ -134,15 +150,12 @@ def compute(
     for rating, mode in solves:
         count += 1
         if rating < band_low:
-            band_factor = below_factor
             below += 1
         elif rating > band_high:
-            band_factor = above_factor
             above += 1
         else:
-            band_factor = in_factor
             in_band += 1
-        total += band_factor * mode_factor(mode, cfg)
+        total += solve_points(rating, band_low, band_high, mode, cfg)
         if rating > max_rating:
             max_rating = rating
 

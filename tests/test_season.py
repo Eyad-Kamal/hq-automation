@@ -7,6 +7,7 @@ and that only the season flags and Season Points / Season Solved change.
 from __future__ import annotations
 
 import logging
+import re
 from datetime import date, datetime, timezone
 
 from hq import config
@@ -295,7 +296,7 @@ def test_flag_cap_limits_writes_per_run_and_later_runs_finish() -> None:
         runs += 1
         assert runs < 20, "the cap must not stall the flags forever"
         result = recompute.run(w.context())
-        if "(capped: no)" in result.details:
+        if re.search(r"in-season flags changed: \d+ \(capped: no\)", result.details):
             break
     _every_flag_correct(w, SEASON)
 

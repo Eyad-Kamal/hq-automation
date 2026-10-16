@@ -16,6 +16,9 @@ For each active member (and then for teams and goals on full runs):
 * Learning Queue rows get mastery counts and the auto tier. The queue status
   moves Queued -> Practicing when the first solve arrives. It never becomes
   Mastered automatically.
+* Before mastery, each member's solves are routed to Topics (see ``_route_member_topics``):
+  same-band topics are filled in roadmap order. Script-owned rows get Topics and "Auto Topics"
+  rewritten (at most TOPIC_ROUTE_PER_RUN per run); user-edited rows are kept as they are.
 * Goals get Current; Status becomes Achieved when Current reaches Target. Topic goals
   (Topic Problems, Topic Tier, Level Topics ≥ Competent) use the goal's Linked Topics or
   Linked Level; a goal without the link it needs is skipped with a warning.
@@ -46,8 +49,9 @@ from hq import notion as nt
 from hq import schema as S
 from hq.config import num
 from hq.jobs import OK, WARNING, Context, JobResult
-from hq.logic import achievements, goals, mastery, scoring, streak
+from hq.logic import achievements, goals, mastery, scoring, streak, topic_map
 from hq.logic.problem_ref import identities
+from hq.logic.topic_map import TopicInfo
 from hq.logic.season import Season, in_season
 from hq.repo import (
     Member,
@@ -57,6 +61,7 @@ from hq.repo import (
     get_checkbox,
     get_date,
     get_formula,
+    get_multi,
     get_number,
     get_relation,
     get_select,
@@ -106,7 +111,11 @@ SEASON_FLAG_SPECS: tuple[tuple[str, str, str, str, str | None], ...] = (
 
 @dataclass
 class Solved:
-    """One solved problem of one member, read from the Problems table."""
+    """One solved problem of one member, read from the Problems table.
+
+    ``topic_ids`` starts as the row's current Topics and is replaced by the routed topics
+    for script-owned rows (see ``_route_member_topics``) before mastery is computed.
+    """
 
     page_id: str
     key: str
@@ -116,6 +125,23 @@ class Solved:
     day: date | None
     points: float
     topic_ids: list[str]
+    page: dict = field(default_factory=dict)
+    solved_on: str = ""  # ISO text of Solved On ("" when empty); the routing order key
+    cf_tags: tuple[str, ...] = ()
+    auto_topics: tuple[str, ...] = ()  # ids in the Auto Topics text, in order
+    imported: bool = False
+    current_topics: tuple[str, ...] = ()  # the row's Topics as read, before routing
+    owned: bool = False  # script-owned (routing may rewrite Topics)
+
+
+@dataclass
+class TopicRouting:
+    """Per-run state of the topic router: the write budget and what was written."""
+
+    budget: int
+    enabled: bool  # False when the Problems schema has no "Auto Topics" (no writes)
+    written: int = 0
+    capped: bool = False
 
 
 @dataclass
@@ -237,6 +263,7 @@ def _member_problems(
         else:
             points = scoring.points(effective, ref_here, mode, upsolve=upsolve, editorial=editorial)
         solved_on = get_date(page, S.P_Problems.SOLVED_ON)
+        current_topics = tuple(get_relation(page, S.P_Problems.TOPICS))
         solved.append(
             Solved(
                 page_id=page["id"],
@@ -246,7 +273,13 @@ def _member_problems(
                 mode=mode,
                 day=cairo_day_of(solved_on),
                 points=points,
-                topic_ids=get_relation(page, S.P_Problems.TOPICS),
+                topic_ids=list(current_topics),
+                page=page,
+                solved_on=solved_on.isoformat() if solved_on is not None else "",
+                cf_tags=tuple(get_multi(page, S.P_Problems.CF_TAGS)),
+                auto_topics=_parse_ids(get_text(page, S.P_Problems.AUTO_TOPICS)),
+                imported=get_checkbox(page, S.P_Problems.IMPORTED),
+                current_topics=current_topics,
             )
         )
     return solved
@@ -372,9 +405,15 @@ def run(ctx: Context) -> JobResult:
 
     who_fixed = _fill_who_team(repo, members)
     season = season_rules(ctx)
+    routing = TopicRouting(
+        budget=max(0, int(num(ctx.cfg, K.TOPIC_ROUTE_PER_RUN))),
+        enabled=_auto_topics_exists(repo),
+    )
+    if not routing.enabled:
+        log.warning('Problems property "Auto Topics" is missing; topic writes are skipped this run')
     for member in members:
         try:
-            results[member.id] = _recompute_member(ctx, member, topics, today, duplicates, season)
+            results[member.id] = _recompute_member(ctx, member, topics, today, duplicates, season, routing)
         except Exception as exc:  # noqa: BLE001 - one member must not stop the others
             log.exception("recompute failed for %s", member.name)
             errors.append(f"{member.name}: {type(exc).__name__}: {exc}")
@@ -391,8 +430,11 @@ def run(ctx: Context) -> JobResult:
         f"Who/Team filled or corrected: {who_fixed}",
         f"season start: {season.start.isoformat() if season.start else 'none'}; "
         f"in-season flags changed: {flags_written} (capped: {'yes' if flags_capped else 'no'})",
+        f"topics routed: {routing.written} (capped: {'yes' if routing.capped else 'no'})",
         *errors,
     ]
+    if not routing.enabled:
+        details.append('warning: Problems property "Auto Topics" is missing; topic writes skipped')
     if duplicates:
         details.append(f"duplicate rows ignored ({len(duplicates)}): " + "; ".join(sorted(set(duplicates))))
     result = WARNING if (errors or duplicates) else OK
@@ -437,11 +479,14 @@ def _recompute_member(
     today: date,
     duplicates: list[str],
     season: Season,
+    routing: TopicRouting,
 ) -> MemberResult:
     repo = ctx.repo
     cfg = ctx.cfg
     ref = member_ref_rating(repo, member)
     solved = _member_problems(repo, member, ref, cfg, duplicates)
+    infos = [t.info() for t in topics.values() if t.has_band]
+    _route_member_topics(repo, member, solved, infos, cfg, routing)
     season_solves = [p for p in solved if in_season(p.day, season.start_for(member.id))]
     entries = _attended_entries(repo, member, duplicates)
     contest_days = Counter(cairo_day_of(get_date(e, S.P_ContestEntries.DATE)) for e in entries)
@@ -585,6 +630,101 @@ def _sum_points(stats: dict[date, DayStat], start: date, end: date) -> float:
             total += stats[day].points
         day += timedelta(days=1)
     return round(total, 2)
+
+
+def _parse_ids(text: str) -> tuple[str, ...]:
+    """Topic ids of a comma-separated text (the Auto Topics format), in order, without blanks."""
+    return tuple(part.strip() for part in text.split(",") if part.strip())
+
+
+def _auto_topics_exists(repo: Repo) -> bool:
+    """True when the Problems schema has the "Auto Topics" property. A failed read counts as missing."""
+    try:
+        return S.P_Problems.AUTO_TOPICS in repo.data_source_properties(S.DB_PROBLEMS)
+    except Exception:  # noqa: BLE001 - a schema read must not stop the recompute
+        log.warning("could not read the Problems schema; topic writes are skipped this run", exc_info=True)
+        return False
+
+
+def _script_owned(solved: Solved, infos: list[TopicInfo]) -> bool:
+    """Whether recompute may rewrite this row's Topics (the ownership rules, in order):
+
+    (a) Auto Topics is non-empty and equals the row's current Topics set;
+    (b) Auto Topics is empty, the row is Imported, and its current Topics equal what the old
+        ``map_topics`` gives for its CF Tags and effective rating (adopts imported rows);
+    (c) Topics is empty and the row has CF Tags.
+    """
+    current = set(solved.current_topics)
+    if solved.auto_topics and set(solved.auto_topics) == current:
+        return True
+    if not solved.auto_topics and solved.imported:
+        if current == set(topic_map.map_topics(solved.cf_tags, solved.effective, infos)):
+            return True
+    return bool(not current and solved.cf_tags)
+
+
+def _route_member_topics(
+    repo: Repo,
+    member: Member,
+    solved: list[Solved],
+    infos: list[TopicInfo],
+    cfg: dict[str, Any],
+    routing: TopicRouting,
+) -> None:
+    """Route each deduped solve of one member to topics in roadmap order (see
+    ``topic_map.route_topics_sequential``), replace ``topic_ids`` of the script-owned rows with
+    the routed ids, and write Topics + Auto Topics of those rows whose value changes (at most
+    ``routing.budget`` rows per run). User-owned rows keep their Topics and still count toward
+    running mastery."""
+    if not infos:
+        return
+    overrides: dict[str, str] = {}
+    for row in repo.rows(S.DB_LEARNING_QUEUE):
+        if member.id not in get_relation(row, S.P_LearningQueue.MEMBER):
+            continue
+        override = get_select(row, S.P_LearningQueue.COACH_OVERRIDE)
+        topic_ids = get_relation(row, S.P_LearningQueue.TOPIC)
+        if override and topic_ids:
+            overrides[topic_ids[0]] = override
+
+    ordered = sorted(solved, key=lambda s: (0 if s.solved_on else 1, s.solved_on, s.page_id))
+    for item in ordered:
+        item.owned = _script_owned(item, infos)
+    problems = [
+        topic_map.RouteProblem(
+            row_id=item.page_id,
+            tags=item.cf_tags,
+            rating=item.effective,
+            mode=item.mode,
+            fixed=None if item.owned else item.current_topics,
+        )
+        for item in ordered
+    ]
+    routed = topic_map.route_topics_sequential(
+        problems,
+        infos,
+        tier_threshold=num(cfg, K.TIER_COMPETENT),
+        factor_fn=lambda rating, low, high, mode: mastery.solve_points(rating, low, high, mode, cfg),
+        overrides=overrides,
+    )
+
+    for item in ordered:
+        if not item.owned:
+            continue
+        new_ids = routed.get(item.page_id, [])
+        item.topic_ids = list(new_ids)
+        props: dict[str, Any] = {}
+        if set(new_ids) != set(item.current_topics):
+            props[S.P_Problems.TOPICS] = nt.p_relation(new_ids)
+        if tuple(new_ids) != item.auto_topics:
+            props[S.P_Problems.AUTO_TOPICS] = nt.p_text(",".join(new_ids))
+        if not props or not routing.enabled:
+            continue
+        if routing.written >= routing.budget:
+            routing.capped = True
+            continue
+        repo.update(S.DB_PROBLEMS, item.page, props)
+        routing.written += 1
 
 
 def _update_learning_queue(
