@@ -22,6 +22,9 @@ Outputs (all keyed by Source Key so a rerun updates instead of duplicating):
 
 Team and club summaries, the report and the MVP are only produced on full runs
 (without --member); a single-member run only refreshes that member's summary.
+
+Each summary also gets its In Season checkbox (Week Start on or after the season start:
+the member's effective start for Person rows, the global start for Team and Club rows).
 """
 
 from __future__ import annotations
@@ -39,6 +42,7 @@ from hq.config import num
 from hq.jobs import OK, Context, JobResult
 from hq.jobs import recompute
 from hq.logic import weekly
+from hq.logic.season import Season, in_season
 from hq.notify import comment_rich_text
 from hq.repo import (
     Member,
@@ -84,6 +88,7 @@ def run(ctx: Context) -> JobResult:
     members = [m for m in repo.members() if m.active]
     scope = ctx.active_members()
     full_run = ctx.member_filter is None
+    season = recompute.season_rules(ctx)
     rating_delta, topics_per_member = _week_extras(repo, week_begin, saturday)
 
     person_rows: dict[str, list[dict]] = {}
@@ -125,6 +130,7 @@ def run(ctx: Context) -> JobResult:
             member_id=m.id,
             mvp=mvp_member is not None and mvp_member.id == m.id,
             report_id=report["id"] if report else None,
+            season=season,
         )
     if mvp_member is not None:
         _award_mvp(repo, mvp_member, week_begin, label, person_summary[mvp_member.id])
@@ -143,6 +149,7 @@ def run(ctx: Context) -> JobResult:
                 team_id=team["id"],
                 mvp=False,
                 report_id=report["id"] if report else None,
+                season=season,
             )
         _upsert_summary(
             repo,
@@ -155,6 +162,7 @@ def run(ctx: Context) -> JobResult:
             key=f"club:club:{week_begin.isoformat()}",
             mvp=False,
             report_id=report["id"] if report else None,
+            season=season,
         )
 
     history_rows = 0
@@ -214,6 +222,7 @@ def backfill_history(ctx: Context, week_offsets: range) -> int:
     writes_before = repo.writes
     index = _computed_daily_index(ctx)
     members = [m for m in repo.members() if m.active]
+    season = recompute.season_rules(ctx)
     for k in week_offsets:
         week_begin = saturday - timedelta(days=7 * k)
         prev_begin = week_begin - timedelta(days=7)
@@ -229,12 +238,12 @@ def backfill_history(ctx: Context, week_offsets: range) -> int:
             summary["topics_advanced"] = len(topics_per_member.get(m.id, set()))
             _upsert_history_summary(
                 repo, m.name, "Person", m.name, week_begin, label, summary,
-                key=f"person:{m.id}:{week_begin.isoformat()}", member_id=m.id,
+                key=f"person:{m.id}:{week_begin.isoformat()}", member_id=m.id, season=season,
             )
         for team, summary in _team_summaries(repo, members, person_rows, person_prev, rating_delta, topics_per_member):
             _upsert_history_summary(
                 repo, team["name"], "Team", team["name"], week_begin, label, summary,
-                key=f"team:{team['id']}:{week_begin.isoformat()}", team_id=team["id"],
+                key=f"team:{team['id']}:{week_begin.isoformat()}", team_id=team["id"], season=season,
             )
         club_rows = _aggregate([row for rows in person_rows.values() for row in rows])
         club = weekly.summarize(club_rows, sum(person_prev.values()))
@@ -242,7 +251,7 @@ def backfill_history(ctx: Context, week_offsets: range) -> int:
         club["topics_advanced"] = len(set().union(*topics_per_member.values())) if topics_per_member else 0
         _upsert_history_summary(
             repo, "Club", "Club", "Club", week_begin, label, club,
-            key=f"club:club:{week_begin.isoformat()}",
+            key=f"club:club:{week_begin.isoformat()}", season=season,
         )
     return repo.writes - writes_before
 
@@ -259,6 +268,7 @@ def _upsert_history_summary(
     key: str,
     member_id: str | None = None,
     team_id: str | None = None,
+    season: Season | None = None,
 ) -> None:
     """Upsert a summary for a backfilled week, keeping the MVP tick and Report link that
     an existing row already has."""
@@ -268,7 +278,7 @@ def _upsert_history_summary(
     _upsert_summary(
         repo, name, scope, who, week_begin, label, summary,
         key=key, member_id=member_id, team_id=team_id, mvp=mvp,
-        report_id=report_ids[0] if report_ids else None,
+        report_id=report_ids[0] if report_ids else None, season=season,
     )
 
 
@@ -510,6 +520,7 @@ def _upsert_summary(
     team_id: str | None = None,
     mvp: bool,
     report_id: str | None,
+    season: Season | None = None,
 ) -> None:
     props = {
         S.P_WeeklySummary.TITLE: nt.p_title(f"{name} · {label}"),
@@ -532,6 +543,8 @@ def _upsert_summary(
         S.P_WeeklySummary.TEAM: nt.p_relation([team_id] if team_id else []),
         S.P_WeeklySummary.REPORT: nt.p_relation([report_id] if report_id else []),
     }
+    if season is not None:
+        props[S.P_WeeklySummary.IN_SEASON] = nt.p_checkbox(in_season(week_begin, season.start_for(member_id)))
     repo.upsert(S.DB_WEEKLY_SUMMARY, S.P_WeeklySummary.SOURCE_KEY, key, props, icon=icons.icon_for(S.DB_WEEKLY_SUMMARY, props))
 
 

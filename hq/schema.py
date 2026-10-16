@@ -136,6 +136,9 @@ class P_Members:
     DASHBOARD = "Dashboard"
     JOINED = "Joined"
     LAST_SYNC = "Last Sync"
+    SEASON_START = "Season Start"  # coach reset: this member's season starts here (date)
+    SEASON_POINTS = "Season Points"  # points of deduped solves in season
+    SEASON_SOLVED = "Season Solved"  # deduped solves in season
     # relations
     TEAM = "Team"
     LEVEL = "Level"
@@ -199,6 +202,7 @@ class P_Problems:
     RATING_AT_SOLVE = "Rating @ Solve"
     IMPORTED = "Imported"
     SOURCE_KEY = "Source Key"
+    IN_SEASON = "In Season"  # checkbox: solve is on or after the member's effective season start
     KEY_IDEA = "Key Idea"
     NOTES = "Notes"
     CREATED = "Created"
@@ -252,6 +256,7 @@ class P_ContestEntries:
     PENALTY = "Penalty"
     BLOCKERS = "Blockers"
     TAKEAWAY = "Takeaway"
+    IN_SEASON = "In Season"  # checkbox
     # relations
     CONTEST = "Contest"
     MEMBER = "Member"
@@ -432,6 +437,7 @@ class P_DailyLog:
     MINUTES = "Minutes"
     REFLECTION = "Reflection"
     SOURCE_KEY = "Source Key"
+    IN_SEASON = "In Season"  # checkbox
     # relations
     MEMBER = "Member"
     # formulas
@@ -457,6 +463,7 @@ class P_WeeklySummary:
     TOPICS_ADVANCED = "Topics Advanced"
     MVP = "MVP"
     SOURCE_KEY = "Source Key"
+    IN_SEASON = "In Season"  # checkbox
     # relations
     MEMBER = "Member"
     TEAM = "Team"
@@ -489,6 +496,7 @@ class P_Config:
     TITLE = "Key"
     VALUE = "Value"
     NUMBER = "Number"
+    DATE = "Date"  # date property; SEASON_START reads it first
     DESCRIPTION = "Description"
 
 
@@ -601,6 +609,8 @@ class ConfigKey:
     LEETCODE_DAILY_TASKS = "LEETCODE_DAILY_TASKS"  # 1 = one "LeetCode daily" task per Active member each day
     ICON_BACKFILL_PER_RUN = "ICON_BACKFILL_PER_RUN"  # most empty row icons set per run (auto job)
     TITLE_FIX_PER_RUN = "TITLE_FIX_PER_RUN"  # most old emoji title prefixes removed per run (onboard job)
+    SEASON_START = "SEASON_START"  # Config "Date" (or Value YYYY-MM-DD): global season start; empty = no season
+    SEASON_FLAG_PER_RUN = "SEASON_FLAG_PER_RUN"  # most In Season checkboxes written per recompute run
 
 
 # Source Key prefix of the automatic "LeetCode daily" task: "lcdaily:<date>:<member id>".

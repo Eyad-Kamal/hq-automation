@@ -7,17 +7,21 @@ the database fall back to ``DEFAULTS`` (the values in build/schema-spec.md).
 Job state (last import, last daily run, last weekly run) is stored as extra
 Config rows with the keys ``STATE_*`` below. Their Value is an ISO timestamp
 or date.
+
+SEASON_START is read differently: its Config "Date" property (the Cairo day of it)
+wins; otherwise its Value text must be YYYY-MM-DD. Empty or invalid means no season.
 """
 
 from __future__ import annotations
 
 import logging
+import re
 from datetime import date, datetime, timezone
 from typing import Any
 
 from hq import notion as nt
 from hq import schema as S
-from hq.repo import Repo, get_number, get_text, get_title
+from hq.repo import Repo, cairo_day_of, get_date, get_number, get_text, get_title
 
 log = logging.getLogger("hq.config")
 
@@ -68,7 +72,29 @@ DEFAULTS: dict[str, Any] = {
     "WEEKLY_BACKFILL_WEEKS": 12,
     "DASHBOARDS_AUTO": 1,
     "ADMIN_USER_ID": "",
+    "SEASON_START": None,  # a date, or None = no season (see _season_start)
+    "SEASON_FLAG_PER_RUN": 400,
 }
+
+_ISO_DAY = re.compile(r"\d{4}-\d{2}-\d{2}")
+
+
+def _season_start(page: dict[str, Any]) -> date | None:
+    """The global season start of the SEASON_START row: its Date property (Cairo day), else
+    its Value text as YYYY-MM-DD. None when both are empty or the text is not a date."""
+    when = cairo_day_of(get_date(page, S.P_Config.DATE))
+    if when is not None:
+        return when
+    text = get_text(page, S.P_Config.VALUE).strip()
+    if not text:
+        return None
+    if _ISO_DAY.fullmatch(text):
+        try:
+            return date.fromisoformat(text)
+        except ValueError:
+            pass
+    log.warning("Config %s has an invalid date %r (expected YYYY-MM-DD); there is no season start", S.ConfigKey.SEASON_START, text)
+    return None
 
 
 def load(repo: Repo) -> dict[str, Any]:
@@ -77,6 +103,9 @@ def load(repo: Repo) -> dict[str, Any]:
     for page in repo.rows(S.DB_CONFIG):
         key = get_title(page, S.P_Config.TITLE).strip()
         if not key:
+            continue
+        if key == S.ConfigKey.SEASON_START:
+            cfg[key] = _season_start(page)
             continue
         number = get_number(page, S.P_Config.NUMBER)
         if number is not None:

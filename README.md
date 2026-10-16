@@ -161,6 +161,8 @@ Do not delete rows. The important ones:
 | `ICON_BACKFILL_PER_RUN` | 300 | Most empty row icons set per run, one row from each database in turn (the onboard job reports the counts in the Sync Log) (the icons are real logos where one exists, otherwise emoji). Icons the user set are never replaced. 0 = off for existing rows; new rows still get their icon |
 | `TITLE_FIX_PER_RUN` | 200 | Most Tasks and Weekly Reports titles cleaned per run (the old emoji prefix is removed; the row icon shows it now). 0 = off |
 | `DAILY_LOG_DAYS` | 60 | Daily Log days recomputed per member (back from today) |
+| `SEASON_START` | empty (no season) | Not a number: set its **Date** (or Value as `YYYY-MM-DD`). The season starts that day. See [Seasons](#seasons-start-from-0-without-deleting-anything) |
+| `SEASON_FLAG_PER_RUN` | 400 | Most "In Season" checkboxes one recompute run writes. The rest follow on later runs |
 | `WEEKLY_BACKFILL_WEEKS` | 12 | Complete past weeks whose Weekly Summary rows are kept filled (no reports or MVP for older weeks) |
 | `DASHBOARDS_AUTO` | 1 | 1 = create a personal dashboard page for each active member with an empty Dashboard URL. 0 = off |
 | `FREEZE_EVERY` / `FREEZE_MAX` | 7 / 2 | A freeze is earned per 7 active days, up to 2 |
@@ -186,7 +188,7 @@ Every run (every 10 minutes) does, in order:
 1. **onboard**: fills in new members (queue rows, targets, subscriptions).
 2. **contests**: updates the contest list from all three platforms, and creates contest tasks.
 3. **alerts**: posts reminders for contests starting within `ALERT_MINUTES` (+10 minutes of slack).
-4. **imports + recompute**: only when the last import was more than 25 minutes ago. Each trainee's import starts 2 days before their last successful sync (or looks back `IMPORT_BACKFILL_DAYS` for a first import). A trainee whose source failed keeps the old sync date, so nothing is skipped.
+4. **imports + recompute**: only when the last import was more than 25 minutes ago. Each trainee's import starts 2 days before their last successful sync (or looks back `IMPORT_BACKFILL_DAYS` for a first import). A trainee whose source failed keeps the old sync date, so nothing is skipped. Recompute also sets the "In Season" checkboxes and the season totals (see Seasons).
 5. **daily**: only once per Cairo day. Creates today's LeetCode daily task and upsolve reminders (and
    topic practice tasks when `AUTO_PRACTICE_TASKS` is 1), and marks yesterday's unfinished auto tasks
    (practice and LeetCode daily) as Skipped.
@@ -198,6 +200,42 @@ Every run (every 10 minutes) does, in order:
 Every job can run any number of times. Each record has a stable key, so reruns update or skip
 instead of duplicating. Your own edits are kept: the import fills only empty fields and never
 overwrites Notes, Key Idea, Time (min), or a Mode you changed.
+
+## Seasons: start from 0 without deleting anything
+
+A season lets everyone start from 0 in the season views, while the all-time views keep everything.
+**Nothing is deleted.** Solves, Daily Log, contests, streaks, achievements and goals all stay. Only
+the season flags and season totals change, and the all-time numbers (Total Points, Cumulative Points,
+daily points) are never touched.
+
+**What the season uses:**
+
+- **SEASON_START** (Config): the season starts on this day. Empty or not a date means no season, and
+  everything counts as in season.
+- **Season Start** (Members, one person): a coach reset for one trainee. The member's effective start
+  is the later of the global start and this date, so an earlier date does not reach back.
+- **In Season** (checkbox on Problems, Daily Log, Contest Entries, Weekly Summary): set by recompute
+  and by the weekly job. Team and club rows, and Team contest entries, use the global start.
+- **Season Points** and **Season Solved** (Members): the points and count of the member's solves on or
+  after their effective start, after duplicates are removed.
+
+**To start a new season for everyone:** open **Admin → Config**, find the row with Key `SEASON_START`, and
+set **Date** to today (Cairo). In Notion you can also do this with a button: an "Edit pages" button on that
+row can set Date to Today. The flags update at the next recompute, which runs with the import (about every
+30 minutes). To apply it now, run the workflow with **force** ticked.
+
+**To reset one trainee:** set that trainee's **Season Start** to the date their new season begins.
+
+**To end seasons:** clear the Date and Value of the `SEASON_START` row. Everything is in season again.
+
+**Notes:**
+
+- Recompute writes at most `SEASON_FLAG_PER_RUN` (400) checkboxes per run. A large change finishes over
+  several runs. The Sync Log details show `in-season flags changed: N (capped: yes/no)`.
+- A Weekly Summary counts as in season when its week starts on or after the season start. So the first
+  week of a season is the first Saturday on or after that date.
+- Season views in Notion must filter on **In Season** (checked), or on the Season Points / Season Solved
+  numbers. Existing views keep showing all-time numbers.
 
 ## When something goes wrong
 

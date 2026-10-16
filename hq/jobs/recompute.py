@@ -24,6 +24,11 @@ For each active member (and then for teams and goals on full runs):
   weekly job awards it per week.
 * Daily auto Topic Practice tasks get Done Count (the listed problems the member
   has solved) and become Done once Done Count reaches Target.
+* Seasons (nothing is deleted): Members get Season Points and Season Solved (deduped solves
+  on or after the member's effective season start). The "In Season" checkboxes of Problems,
+  Daily Log, Contest Entries and Weekly Summary are set by ``_season_flags``, at most
+  SEASON_FLAG_PER_RUN writes per run. Points per day and Cumulative Points stay all-time.
+  See ``hq.logic.season`` and README "Seasons".
 
 Team totals and goals are only recomputed on full runs (no --member filter).
 """
@@ -43,6 +48,7 @@ from hq.config import num
 from hq.jobs import OK, WARNING, Context, JobResult
 from hq.logic import achievements, goals, mastery, scoring, streak
 from hq.logic.problem_ref import identities
+from hq.logic.season import Season, in_season
 from hq.repo import (
     Member,
     Repo,
@@ -82,6 +88,20 @@ ADDITIVE_GOALS = frozenset(
 )  # Team scope sums these; "Topic Tier" takes the best member's tier (max).
 NOT_RECOMPUTED_BADGES = frozenset({"Weekly MVP"})
 TASK_OPEN_STATUSES = frozenset({"To Do", "Planned", "In Progress"})
+# (database, member relation, date property, In Season property, Mode property or None).
+# A row with no member, or a Contest Entry whose Mode is Team, uses the global season start.
+SEASON_FLAG_SPECS: tuple[tuple[str, str, str, str, str | None], ...] = (
+    (S.DB_PROBLEMS, S.P_Problems.MEMBER, S.P_Problems.SOLVED_ON, S.P_Problems.IN_SEASON, None),
+    (S.DB_DAILY_LOG, S.P_DailyLog.MEMBER, S.P_DailyLog.DATE, S.P_DailyLog.IN_SEASON, None),
+    (
+        S.DB_CONTEST_ENTRIES,
+        S.P_ContestEntries.MEMBER,
+        S.P_ContestEntries.DATE,
+        S.P_ContestEntries.IN_SEASON,
+        S.P_ContestEntries.MODE,
+    ),
+    (S.DB_WEEKLY_SUMMARY, S.P_WeeklySummary.MEMBER, S.P_WeeklySummary.WEEK_START, S.P_WeeklySummary.IN_SEASON, None),
+)
 
 
 @dataclass
@@ -110,6 +130,12 @@ class DayStat:
 class MemberResult:
     stats: dict[str, Any]
     solved: list[Solved] = field(default_factory=list)
+
+
+def season_rules(ctx: Context) -> Season:
+    """The global season start (Config SEASON_START) and every member's own Season Start."""
+    own = {m.id: cairo_day_of(get_date(m.page, S.P_Members.SEASON_START)) for m in ctx.repo.members()}
+    return Season(start=ctx.cfg.get(K.SEASON_START), own_starts=own)
 
 
 def member_ref_rating(repo: Repo, member: Member) -> int:
@@ -345,12 +371,14 @@ def run(ctx: Context) -> JobResult:
     duplicates: list[str] = []
 
     who_fixed = _fill_who_team(repo, members)
+    season = season_rules(ctx)
     for member in members:
         try:
-            results[member.id] = _recompute_member(ctx, member, topics, today, duplicates)
+            results[member.id] = _recompute_member(ctx, member, topics, today, duplicates, season)
         except Exception as exc:  # noqa: BLE001 - one member must not stop the others
             log.exception("recompute failed for %s", member.name)
             errors.append(f"{member.name}: {type(exc).__name__}: {exc}")
+    flags_written, flags_capped = _season_flags(ctx, season)
 
     if ctx.member_filter is None:
         _update_teams(repo)
@@ -361,6 +389,8 @@ def run(ctx: Context) -> JobResult:
         f"members recomputed: {len(results)}/{len(members)}",
         f"writes: {items}",
         f"Who/Team filled or corrected: {who_fixed}",
+        f"season start: {season.start.isoformat() if season.start else 'none'}; "
+        f"in-season flags changed: {flags_written} (capped: {'yes' if flags_capped else 'no'})",
         *errors,
     ]
     if duplicates:
@@ -369,17 +399,50 @@ def run(ctx: Context) -> JobResult:
     return JobResult(job=JOB, result=result, items=items, details="\n".join(details))
 
 
+def _season_flag_changes(ctx: Context, season: Season, scope: set[str] | None) -> list[tuple[str, dict, str, bool]]:
+    """Rows whose In Season checkbox differs from the wanted value, as (database, row, flag property,
+    wanted). ``scope`` (member ids of a --member run) limits the rows; None means every row."""
+    changes: list[tuple[str, dict, str, bool]] = []
+    for db, member_prop, date_prop, flag_prop, mode_prop in SEASON_FLAG_SPECS:
+        for row in ctx.repo.rows(db):
+            member_ids = get_relation(row, member_prop)
+            member_id = member_ids[0] if member_ids else None
+            if mode_prop is not None and get_select(row, mode_prop) == "Team":
+                member_id = None
+            if scope is not None and member_id not in scope:
+                continue
+            wanted = in_season(cairo_day_of(get_date(row, date_prop)), season.start_for(member_id))
+            if get_checkbox(row, flag_prop) != wanted:
+                changes.append((db, row, flag_prop, wanted))
+    return changes
+
+
+def _season_flags(ctx: Context, season: Season) -> tuple[int, bool]:
+    """Write the wrong In Season checkboxes, at most SEASON_FLAG_PER_RUN per run (the rest on later
+    runs). Returns (checkboxes written, whether the cap left some for later)."""
+    scope = None if ctx.member_filter is None else {m.id for m in ctx.members()}
+    budget = max(0, int(num(ctx.cfg, K.SEASON_FLAG_PER_RUN)))
+    changes = _season_flag_changes(ctx, season, scope)
+    written = 0
+    for db, row, flag_prop, wanted in changes[:budget]:
+        if ctx.repo.sync(db, row, {flag_prop: nt.p_checkbox(wanted)}):
+            written += 1
+    return written, len(changes) > budget
+
+
 def _recompute_member(
     ctx: Context,
     member: Member,
     topics: dict[str, Topic],
     today: date,
     duplicates: list[str],
+    season: Season,
 ) -> MemberResult:
     repo = ctx.repo
     cfg = ctx.cfg
     ref = member_ref_rating(repo, member)
     solved = _member_problems(repo, member, ref, cfg, duplicates)
+    season_solves = [p for p in solved if in_season(p.day, season.start_for(member.id))]
     entries = _attended_entries(repo, member, duplicates)
     contest_days = Counter(cairo_day_of(get_date(e, S.P_ContestEntries.DATE)) for e in entries)
     stats = _day_stats(solved, contest_days)
@@ -430,6 +493,8 @@ def _recompute_member(
             S.P_Members.BEST_STREAK: nt.p_number(current_state.best),
             S.P_Members.FREEZES: nt.p_number(current_state.freezes),
             S.P_Members.LAST_ACTIVE: nt.p_date(last_active, with_time=False),
+            S.P_Members.SEASON_POINTS: nt.p_number(round(sum(p.points for p in season_solves), 2)),
+            S.P_Members.SEASON_SOLVED: nt.p_number(len(season_solves)),
         },
     )
 
