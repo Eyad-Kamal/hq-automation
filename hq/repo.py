@@ -36,6 +36,30 @@ Json = dict[str, Any]
 
 _NUMBER_EPS = 1e-9
 
+# The configured title property of each database (schema.py). A renamed title column is
+# found from the live schema (``Repo._live_title``); these names are the fallback.
+TITLE_PROPS: dict[str, str] = {
+    S.DB_LEVELS: S.P_Levels.TITLE,
+    S.DB_TOPICS: S.P_Topics.TITLE,
+    S.DB_MEMBERS: S.P_Members.TITLE,
+    S.DB_TEAMS: S.P_Teams.TITLE,
+    S.DB_TASKS: S.P_Tasks.TITLE,
+    S.DB_PROBLEMS: S.P_Problems.TITLE,
+    S.DB_CONTESTS: S.P_Contests.TITLE,
+    S.DB_CONTEST_ENTRIES: S.P_ContestEntries.TITLE,
+    S.DB_LEARNING_QUEUE: S.P_LearningQueue.TITLE,
+    S.DB_GOALS: S.P_Goals.TITLE,
+    S.DB_RESOURCES: S.P_Resources.TITLE,
+    S.DB_CODE_TEMPLATES: S.P_CodeTemplates.TITLE,
+    S.DB_ACHIEVEMENTS: S.P_Achievements.TITLE,
+    S.DB_WEEKLY_REPORTS: S.P_WeeklyReports.TITLE,
+    S.DB_DAILY_LOG: S.P_DailyLog.TITLE,
+    S.DB_WEEKLY_SUMMARY: S.P_WeeklySummary.TITLE,
+    S.DB_RATING_HISTORY: S.P_RatingHistory.TITLE,
+    S.DB_CONFIG: S.P_Config.TITLE,
+    S.DB_SYNC_LOG: S.P_SyncLog.TITLE,
+}
+
 
 # ---------------------------------------------------------------------------
 # Raw value helpers
@@ -308,6 +332,7 @@ class Repo:
         self._by_id: dict[str, dict[str, Json]] = {}
         self._index: dict[tuple[str, str], tuple[dict[str, Json], dict[str, str]]] = {}
         self._pending: dict[str, list[Json]] = {}
+        self._live_titles: dict[str, str] = {}
         self._seq = 0
 
     # -- reading ------------------------------------------------------------
@@ -317,12 +342,74 @@ class Repo:
     def rows(self, db: str) -> list[Json]:
         """All rows of a database (queried once per run)."""
         if db not in self._rows:
-            pages = list(self.notion.query(self.ds(db)))
+            pages = self._query(db)
             known = {p["id"] for p in pages}
             pages += [p for p in self._pending.pop(db, []) if p["id"] not in known]
             self._rows[db] = pages
             self._by_id[db] = {p["id"]: p for p in pages}
         return self._rows[db]
+
+    def _query(self, db: str) -> list[Json]:
+        """Every page of a table, with the title property under its configured name."""
+        return [self._rekey_page(db, p) for p in self.notion.query(self.ds(db))]
+
+    def _live_title(self, db: str) -> str:
+        """The title property name the database really has, from its live schema.
+
+        It is the one property of type "title". The configured name is kept when it is
+        the title, when the schema has no title property (for example a schema the fake
+        client does not type), or when the schema cannot be read. Cached per run, so each
+        database's schema is read at most once; one warning when the names differ.
+        """
+        if db in self._live_titles:
+            return self._live_titles[db]
+        configured = TITLE_PROPS[db]
+        live = configured
+        try:
+            props = self.data_source_properties(db)
+        except Exception as exc:  # noqa: BLE001 - a schema read must not stop a run; the configured name is the fallback
+            log.warning("could not read the %s schema; using the title property '%s': %s", db, configured, exc)
+            props = {}
+        titles = [name for name, meta in props.items() if isinstance(meta, dict) and meta.get("type") == "title"]
+        if configured not in titles and len(titles) == 1:
+            live = titles[0]
+        elif configured not in titles and len(titles) > 1:
+            log.warning("%s: %d title properties found and none is '%s'; using '%s'", db, len(titles), configured, configured)
+        if live != configured:
+            log.warning("%s: title property is '%s', expected '%s'; using the live name", db, live, configured)
+        self._live_titles[db] = live
+        return live
+
+    def _rekey_page(self, db: str, page: Json) -> Json:
+        """Rename a page's live title property to the configured name (the cache uses configured names)."""
+        configured = TITLE_PROPS.get(db)
+        if configured is None:
+            return page
+        live = self._live_title(db)
+        props = page.get("properties")
+        if live != configured and isinstance(props, dict) and live in props and configured not in props:
+            page["properties"] = {(configured if k == live else k): v for k, v in props.items()}
+        return page
+
+    def _to_wire(self, db: str, properties: Json) -> Json:
+        """Configured title name -> the database's live title name (what Notion expects)."""
+        configured = TITLE_PROPS.get(db)
+        if configured is None or configured not in properties:
+            return properties
+        live = self._live_title(db)
+        if live == configured:
+            return properties
+        return {(live if k == configured else k): v for k, v in properties.items()}
+
+    def _to_cache(self, db: str, properties: Json) -> Json:
+        """The database's live title name -> configured title name (what the cache uses)."""
+        configured = TITLE_PROPS.get(db)
+        if configured is None or configured in properties:
+            return properties
+        live = self._live_title(db)
+        if live == configured or live not in properties:
+            return properties
+        return {(configured if k == live else k): v for k, v in properties.items()}
 
     def by_id(self, db: str, page_id: str | None) -> Json | None:
         if not page_id:
@@ -403,7 +490,7 @@ class Repo:
     def _create_remote(self, db: str, properties: Json, children: list[Json] | None, icon: Json | None = None) -> Json:
         key_prop, key = _create_key(db, properties)
         try:
-            resp = self.notion.create_page(self.ds(db), properties, children, icon=icon)
+            resp = self.notion.create_page(self.ds(db), self._to_wire(db, properties), children, icon=icon)
         except NotionError as exc:
             if key is None:
                 raise
@@ -414,10 +501,11 @@ class Repo:
                 log.warning("adopted existing %s row for %s=%s", db, key_prop, key)
                 self.sync(db, existing, properties)
                 return existing
-            resp = self.notion.create_page(self.ds(db), properties, children, icon=icon)
+            resp = self.notion.create_page(self.ds(db), self._to_wire(db, properties), children, icon=icon)
+        raw = resp.get("properties")
         page: Json = {
             "id": resp["id"],
-            "properties": copy.deepcopy(resp.get("properties") or properties),
+            "properties": copy.deepcopy(self._to_cache(db, raw) if raw else properties),
         }
         if icon is not None:
             page["icon"] = copy.deepcopy(icon)
@@ -425,7 +513,7 @@ class Repo:
 
     def reload(self, db: str) -> None:
         """Re-read one table from Notion and rebuild its lookup indexes."""
-        pages = list(self.notion.query(self.ds(db)))
+        pages = self._query(db)
         self._rows[db] = pages
         self._by_id[db] = {p["id"]: p for p in pages}
         for slot in [s for s in self._index if s[0] == db]:
@@ -455,7 +543,7 @@ class Repo:
         if self.dry_run:
             self._record(f"update {db}: {_title_of(page.get('properties') or {}) or page['id']} {sorted(properties)}")
         else:
-            self.notion.update_page(page["id"], properties)
+            self.notion.update_page(page["id"], self._to_wire(db, properties))
         page.setdefault("properties", {}).update(copy.deepcopy(properties))
         self._reindex(db, page)
         return page

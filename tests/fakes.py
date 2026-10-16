@@ -19,7 +19,7 @@ from hq.config import load as load_config
 from hq.notion import NotionError
 from hq.jobs import Context
 from hq.models import Contest, RatingChange, Solve
-from hq.repo import Repo
+from hq.repo import TITLE_PROPS, Repo
 
 NOW = datetime(2026, 10, 15, 12, 0, tzinfo=timezone.utc)  # Thu 15 Oct 2026 (Cairo: same day)
 NOW_SATURDAY = datetime(2026, 10, 17, 12, 0, tzinfo=timezone.utc)  # Sat 17 Oct 2026 (after 00:10 Cairo)
@@ -46,6 +46,7 @@ class FakeNotion:
         self.view_faults: set[str] = set()  # view types the fake rejects with HTTP 400
         self.deleted_blocks: list[str] = []
         self.declared: dict[str, set[str]] = {}  # ds id -> property names the schema declares (even with no row yet)
+        self.title_props: dict[str, str] = {}  # ds id -> live title property name (default: the name the rows use)
         self._nb = 0  # block id counter for appended blocks
         self._n = 0
 
@@ -57,7 +58,16 @@ class FakeNotion:
         self.query_log.append(ds_id)
         return copy.deepcopy(self.tables[ds_id])
 
+    def _check_title_key(self, ds_id: str, properties: dict[str, Any] | None) -> None:
+        """Notion rejects a title key that is not the database's title property (a renamed title column)."""
+        live = self.title_props.get(ds_id)
+        db = next((t for t, d in self.ids.items() if d == ds_id), None)
+        configured = TITLE_PROPS.get(db or "")
+        if live is not None and configured and configured != live and configured in (properties or {}):
+            raise NotionError(f"HTTP 400 - Problem is not a property that exists: {configured} (live title is '{live}')", status=400)
+
     def create_page(self, ds_id: str, properties: dict[str, Any], children: Any = None, icon: Any = None) -> dict[str, Any]:
+        self._check_title_key(ds_id, properties)
         self._n += 1
         page_id = f"page-{self._n:05d}"
         fault = self.create_faults.pop(0) if self.create_faults else None
@@ -80,6 +90,7 @@ class FakeNotion:
         if page is None:
             raise KeyError(page_id)
         if properties:
+            self._check_title_key(next(d for d, rows in self.tables.items() if page in rows), properties)
             page["properties"].update(copy.deepcopy(properties))
             self.updates.append((page_id, copy.deepcopy(properties)))
         if icon is not None:
@@ -114,10 +125,18 @@ class FakeNotion:
 
     def retrieve_data_source(self, ds_id: str) -> dict[str, Any]:
         # Property ids are the name with a prefix; enough for the dashboard code under test.
+        # The title property is typed "title" (a property whose row values hold a title); others are "x".
         names: set[str] = set(self.declared.get(ds_id, set()))
+        titles: set[str] = set()
         for row in self.tables.get(ds_id, []):
-            names.update(row.get("properties", {}).keys())
-        return {"id": ds_id, "properties": {n: {"id": f"id-{n}", "type": "x"} for n in sorted(names)}}
+            for name, value in row.get("properties", {}).items():
+                names.add(name)
+                if isinstance(value, dict) and "title" in value:
+                    titles.add(name)
+        if ds_id in self.title_props:
+            names.add(self.title_props[ds_id])
+            titles = {self.title_props[ds_id]}
+        return {"id": ds_id, "properties": {n: {"id": f"id-{n}", "type": "title" if n in titles else "x"} for n in sorted(names)}}
 
     def create_child_page(self, parent_page_id: str, title: str, children: Any = None, icon: Any = None) -> dict[str, Any]:
         self._n += 1
