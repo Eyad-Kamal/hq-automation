@@ -39,7 +39,7 @@ def test_contest_tasks_only_for_subscribed_members_and_once() -> None:
     assert len(tasks) == 1, "only Eyad subscribes to CF Div. 2; Sara subscribes to Div. 3"
     task = tasks[0]
     assert get_relation(task, S.P_Tasks.ASSIGNEE) == [w.eyad]
-    assert task["properties"][S.P_Tasks.TITLE]["title"][0]["text"]["content"] == "🏆 Codeforces Round 1000 (Div. 2)"
+    assert task["properties"][S.P_Tasks.TITLE]["title"][0]["text"]["content"] == "Codeforces Round 1000 (Div. 2)"
     assert get_status(task, S.P_Tasks.STATUS) == "Planned"
     assert task["properties"][S.P_Tasks.SOURCE_KEY]["rich_text"][0]["text"]["content"] == f"contest:CF-2050:{w.eyad}"
 

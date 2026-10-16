@@ -131,7 +131,7 @@ def test_upsolve_reminders_use_the_seven_day_window() -> None:
         )
     daily.run(w.context())
     upsolves = [get_title(t, S.P_Tasks.TITLE) for t in w.notion.rows(S.DB_TASKS) if get_select(t, S.P_Tasks.TYPE) == "Upsolve"]
-    assert upsolves == ["🔁 Upsolve Round recent"]
+    assert upsolves == ["Upsolve Round recent"]
 
 
 # ---------------------------------------------------------------------------
@@ -195,7 +195,7 @@ def test_lc_daily_task_per_active_member_with_the_documented_fields() -> None:
     tasks = _lc_tasks(w)
     assert sorted(get_relation(t, S.P_Tasks.ASSIGNEE)[0] for t in tasks) == sorted([w.eyad, w.sara]), "active members only"
     task = next(t for t in tasks if get_relation(t, S.P_Tasks.ASSIGNEE) == [w.eyad])
-    assert get_title(task, S.P_Tasks.TITLE) == "💡 LeetCode daily: Two Sum"
+    assert get_title(task, S.P_Tasks.TITLE) == "LeetCode daily: Two Sum"
     assert get_select(task, S.P_Tasks.TYPE) == "Custom"
     assert get_status(task, S.P_Tasks.STATUS) == "To Do"
     assert get_select(task, S.P_Tasks.ORIGIN) == "Auto"

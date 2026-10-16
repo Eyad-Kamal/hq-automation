@@ -542,6 +542,23 @@ class Difficulty:
     HARD = "Hard"
 
 
+class GoalMetric:
+    """Values of Goals."Metric". The last three use the goal's links: Topic metrics need "Linked Topics",
+    Level Topics ≥ Competent needs "Linked Level" (see hq.logic.goals)."""
+
+    PROBLEMS_SOLVED = "Problems Solved"
+    POINTS = "Points"
+    CF_RATING = "CF Rating"
+    LEVEL_REACHED = "Level Reached"
+    TOPICS_COMPETENT = "Topics ≥ Competent"
+    STREAK_DAYS = "Streak Days"
+    CONTESTS_ATTENDED = "Contests Attended"
+    PROBLEMS_AT_RATING = "Problems ≥ Rating"
+    TOPIC_PROBLEMS = "Topic Problems"
+    TOPIC_TIER = "Topic Tier"
+    LEVEL_TOPICS_COMPETENT = "Level Topics ≥ Competent"
+
+
 class ConfigKey:
     """Keys of the Config database (Config."Key")."""
 
@@ -583,6 +600,7 @@ class ConfigKey:
     AUTO_PRACTICE_TASKS = "AUTO_PRACTICE_TASKS"  # 1 = daily auto Topic Practice tasks; 0 (default) = coaches assign them
     LEETCODE_DAILY_TASKS = "LEETCODE_DAILY_TASKS"  # 1 = one "LeetCode daily" task per Active member each day
     ICON_BACKFILL_PER_RUN = "ICON_BACKFILL_PER_RUN"  # most empty row icons set per run (auto job)
+    TITLE_FIX_PER_RUN = "TITLE_FIX_PER_RUN"  # most old emoji title prefixes removed per run (onboard job)
 
 
 # Source Key prefix of the automatic "LeetCode daily" task: "lcdaily:<date>:<member id>".

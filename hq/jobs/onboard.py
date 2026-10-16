@@ -14,6 +14,9 @@ Only blank fields are filled. A value the coach set is never overwritten.
 
 Then, when DASHBOARDS_AUTO is 1, every active member without a Dashboard URL gets a
 personal dashboard page (see ``hq.jobs.dashboards``).
+
+Title cleanup: Tasks and Weekly Reports titles used to start with an emoji. The row icon shows
+it now, so the emoji is removed from up to TITLE_FIX_PER_RUN titles per run (idempotent).
 """
 
 from __future__ import annotations
@@ -25,11 +28,14 @@ from hq import notion as nt
 from hq import schema as S
 from hq.config import num
 from hq.jobs import OK, WARNING, Context, JobResult
-from hq.repo import get_relation
+from hq.repo import get_relation, get_title
 from hq.schema import ConfigKey as K
 
 log = logging.getLogger("hq.jobs.onboard")
 JOB = "onboard"
+
+# Emoji that used to start the titles of auto tasks and weekly reports (removed by the title cleanup).
+OLD_TITLE_PREFIXES: tuple[str, ...] = ("🏆 ", "🎯 ", "💡 ", "🔁 ", "📰 ")
 
 DEFAULT_SUBSCRIPTIONS: dict[int, list[str]] = {
     1: ["CF Div. 4", "CF Div. 3", "AtCoder ABC"],
@@ -73,14 +79,41 @@ def run(ctx: Context) -> JobResult:
     except Exception as exc:  # noqa: BLE001 - icons are cosmetic; they must not fail the job
         log.exception("row icon backfill failed")
         failures.append(f"icon backfill: {type(exc).__name__}: {str(exc)[:200]}")
+    title_line = "emoji title prefixes removed: not run"
+    try:
+        title_line = f"emoji title prefixes removed: {_strip_old_title_prefixes(ctx)}"
+    except Exception as exc:  # noqa: BLE001 - titles are cosmetic; they must not fail the job
+        log.exception("title prefix cleanup failed")
+        failures.append(f"title prefix cleanup: {type(exc).__name__}: {str(exc)[:200]}")
     details = [
         f"members checked: {len(members)}",
         f"learning queue rows created: {queue_rows}",
         icon_line,
+        title_line,
         *(f"FAILED {line}" for line in failures),
     ]
     result = WARNING if failures else OK
     return JobResult(job=JOB, result=result, items=repo.writes - writes_before, details="\n".join(details))
+
+
+def _strip_old_title_prefixes(ctx: Context) -> int:
+    """Remove an old emoji prefix from Tasks and Weekly Reports titles: at most TITLE_FIX_PER_RUN
+    renames per run. A renamed title no longer starts with a prefix, so a later run changes nothing.
+    Returns the number of titles renamed."""
+    repo = ctx.repo
+    budget = int(num(ctx.cfg, K.TITLE_FIX_PER_RUN))
+    renamed = 0
+    for db, prop in ((S.DB_TASKS, S.P_Tasks.TITLE), (S.DB_WEEKLY_REPORTS, S.P_WeeklyReports.TITLE)):
+        for page in repo.rows(db):
+            if renamed >= budget:
+                return renamed
+            title = get_title(page, prop)
+            prefix = next((p for p in OLD_TITLE_PREFIXES if title.startswith(p)), None)
+            if prefix is None or not title[len(prefix):].strip():
+                continue
+            repo.sync(db, page, {prop: nt.p_title(title[len(prefix):])})
+            renamed += 1
+    return renamed
 
 
 def _onboard_member(ctx: Context, member, topics, pairs: set) -> int:

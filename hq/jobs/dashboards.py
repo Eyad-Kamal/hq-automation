@@ -2,7 +2,7 @@
 views filtered to that member (Config DASHBOARDS_AUTO, default 1).
 
 For each active member whose Members "Dashboard" URL is empty, the page
-"👤 <Name> · Dashboard" is created under the Members page. It holds a header callout, then one
+"<Name> · Dashboard" is created under the Members page. It holds a header callout, then one
 block group per view:
 
 * a callout with the view's emoji, its bold name and a one-line description (gray marker
@@ -385,7 +385,7 @@ def _attempt(repo: Repo, view: _View, page_id: str, member: Member, report: Repo
 def build_dashboard(ctx: Context, member: Member, report: Report, ids: dict[str, dict[str, str]]) -> str:
     """Create one member's dashboard page and its views. Returns the page URL."""
     repo = ctx.repo
-    title = f"👤 {member.name} · Dashboard"
+    title = f"{member.name} · Dashboard"
     page = repo.create_child_page(DASHBOARD_PARENT_PAGE_ID, title, [_header(member.name)], icon=icons.ui("member"))
     url = page.get("url") or ""
     # The URL is written before any view is created: a view failure must never leave the

@@ -4,14 +4,14 @@
    tasks (Origin Auto) and LeetCode daily tasks. Yesterday's are included, and so are
    any older ones left behind by a missed run.
 2. Topic practice (only when AUTO_PRACTICE_TASKS = 1; default 0, coaches assign them):
-   each active member gets one auto practice task "🎯 <topic>: <n> problems". The topic comes from the member's
+   each active member gets one auto practice task "<topic>: <n> problems". The topic comes from the member's
    learning queue. If the member has any "Learning" row, only those rows are used
    (highest priority, then the earliest deadline, then topic order); otherwise
    Practicing rows, then the first Queued core topic of the member's level. Problems come from the Codeforces problemset, filtered
    by the topic's CF tags and rating band, excluding problems already solved.
    The pick is deterministic: seed = hash(member id, date). Source Key
    "auto:<date>:<member id>" makes the task unique per day.
-3. LeetCode daily (when LEETCODE_DAILY_TASKS = 1, default 1): one "💡 LeetCode daily: <title>"
+3. LeetCode daily (when LEETCODE_DAILY_TASKS = 1, default 1): one "LeetCode daily: <title>"
    task per active member for LeetCode's daily challenge. Source Key
    "lcdaily:<date>:<member id>". If the question cannot be read, a Warning is written and
    no task is created. LeetCode's daily date is compared with the UTC day (assumed to roll
@@ -19,7 +19,7 @@
    day's state is left unset before 06:00 Cairo so the next run retries, and after 06:00
    a Warning is written.
 4. Upsolve reminders: a contest entry (Attended/Upsolving) whose contest ended within
-   UPSOLVE_WINDOW_DAYS (default 7) and whose Upsolve % is below 100 gets one "🔁 Upsolve" task.
+   UPSOLVE_WINDOW_DAYS (default 7) and whose Upsolve % is below 100 gets one "Upsolve <contest>" task.
    Source Key "upsolve:<entry id>:<member id>".
 """
 
@@ -252,7 +252,7 @@ def _create_practice_task(
         return 0, f"{member.name}: no unsolved problems in the band of any queued topic"
     props = member_task_props(
         member,
-        title=f"🎯 {topic.name}: {len(picks)} problems",
+        title=f"{topic.name}: {len(picks)} problems",
         task_type="Topic Practice",
         status="To Do",
         due=cairo_end_of_day(today),
@@ -268,7 +268,7 @@ def _create_practice_task(
 
 
 def _create_lc_daily_task(ctx: Context, member: Member, question: Any, today: date) -> int:
-    """One "💡 LeetCode daily" task for a member (keyed by LeetCode's date). Returns 1 when created."""
+    """One "LeetCode daily" task for a member (keyed by LeetCode's date). Returns 1 when created."""
     repo = ctx.repo
     key = f"{S.LC_DAILY_SOURCE_PREFIX}{question.day.isoformat()}:{member.id}"
     if repo.find(S.DB_TASKS, S.P_Tasks.SOURCE_KEY, key) is not None:
@@ -276,7 +276,7 @@ def _create_lc_daily_task(ctx: Context, member: Member, question: Any, today: da
     notes = " · ".join(part for part in (question.difficulty or "difficulty unknown", ", ".join(question.topic_names)) if part)
     props = member_task_props(
         member,
-        title=f"💡 LeetCode daily: {question.title}",
+        title=f"LeetCode daily: {question.title}",
         task_type="Custom",
         status="To Do",
         due=cairo_end_of_day(today),
@@ -372,7 +372,7 @@ def _create_upsolve_tasks(ctx: Context, member: Member, today: date) -> int:
         name = get_title(contest, S.P_Contests.TITLE) if contest else get_title(entry, S.P_ContestEntries.TITLE)
         props = member_task_props(
             member,
-            title=f"🔁 Upsolve {name}",
+            title=f"Upsolve {name}",
             task_type="Upsolve",
             status="To Do",
             due=cairo_end_of_day(today),

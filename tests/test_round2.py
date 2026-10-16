@@ -196,7 +196,7 @@ def test_2_upsolve_reminders_only_inside_the_window_and_stale_ones_are_skipped()
     result = daily.run(w.context())
     upsolves = [t for t in w.notion.rows(S.DB_TASKS) if get_select(t, S.P_Tasks.TYPE) == "Upsolve"]
     titles = [get_title(t, S.P_Tasks.TITLE) for t in upsolves if get_status(t, S.P_Tasks.STATUS) == "To Do"]
-    assert titles == ["🔁 Upsolve Round recent"], "only the recent contest gets a reminder"
+    assert titles == ["Upsolve Round recent"], "only the recent contest gets a reminder"
     assert get_status(w.notion.page(stale), S.P_Tasks.STATUS) == "Skipped"
     assert "stale upsolve reminders skipped" in result.details
 
@@ -561,7 +561,7 @@ def test_7_onboard_creates_one_dashboard_per_active_member_with_filtered_views()
     dashboards.run(w.context())  # round 3: dashboards are a job of their own, run after recompute and daily
     dashboard_pages = [p for p in w.notion.child_pages if p[0] == dashboards.DASHBOARD_PARENT_PAGE_ID]
     titles = sorted(t for _, t, _ in dashboard_pages)
-    assert titles == ["👤 Eyad · Dashboard", "👤 Sara · Dashboard"], "inactive members get none"
+    assert titles == ["Eyad · Dashboard", "Sara · Dashboard"], "inactive members get none"
     assert get_url(w.notion.page(w.eyad), S.P_Members.DASHBOARD), "the Dashboard URL is stored"
     eyad_views = [v for v in w.notion.views if v["name"] in ("Tasks (open)", "Problems", "Goals", "Achievements")]
     assert eyad_views and all(v["create_database"]["parent"]["type"] == "block_id" for v in eyad_views), "each view sits in its callout"
@@ -604,12 +604,12 @@ def test_7_view_server_error_still_stores_the_url_and_no_duplicate_page_is_creat
     w.notion.view_faults = {"*"}  # every view create fails with HTTP 500
     onboard.run(w.context())
     dashboards.run(w.context())
-    eyad_pages = [p for p in w.notion.child_pages if p[1] == "👤 Eyad · Dashboard"]
+    eyad_pages = [p for p in w.notion.child_pages if p[1] == "Eyad · Dashboard"]
     assert len(eyad_pages) == 1
     assert get_url(w.notion.page(w.eyad), S.P_Members.DASHBOARD), "the URL is written before the views"
     onboard.run(w.context())
     dashboards.run(w.context())
-    assert len([p for p in w.notion.child_pages if p[1] == "👤 Eyad · Dashboard"]) == 1, "no duplicate dashboard"
+    assert len([p for p in w.notion.child_pages if p[1] == "Eyad · Dashboard"]) == 1, "no duplicate dashboard"
 
 
 def test_manual_row_adoption_sets_status_solved_and_keeps_user_values() -> None:

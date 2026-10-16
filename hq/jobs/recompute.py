@@ -16,7 +16,9 @@ For each active member (and then for teams and goals on full runs):
 * Learning Queue rows get mastery counts and the auto tier. The queue status
   moves Queued -> Practicing when the first solve arrives. It never becomes
   Mastered automatically.
-* Goals get Current; Status becomes Achieved when Current reaches Target.
+* Goals get Current; Status becomes Achieved when Current reaches Target. Topic goals
+  (Topic Problems, Topic Tier, Level Topics ≥ Competent) use the goal's Linked Topics or
+  Linked Level; a goal without the link it needs is skipped with a warning.
 * Achievements are awarded once per (badge, member) for the badges that
   ``achievements.evaluate`` returns. "Weekly MVP" is excluded here, because the
   weekly job awards it per week.
@@ -67,7 +69,17 @@ log = logging.getLogger("hq.jobs.recompute")
 JOB = "recompute"
 ATTENDED_STATUSES = frozenset({"Attended", "Upsolving", "Upsolved"})
 COMPETENT_OR_MORE = frozenset({"Competent", "Proficient", "Master"})
-ADDITIVE_GOALS = frozenset({"Problems Solved", "Points", "Contests Attended", "Topics ≥ Competent", "Problems ≥ Rating"})
+ADDITIVE_GOALS = frozenset(
+    {
+        "Problems Solved",
+        "Points",
+        "Contests Attended",
+        "Topics ≥ Competent",
+        "Problems ≥ Rating",
+        goals.TOPIC_PROBLEMS,
+        goals.LEVEL_TOPICS_COMPETENT,
+    }
+)  # Team scope sums these; "Topic Tier" takes the best member's tier (max).
 NOT_RECOMPUTED_BADGES = frozenset({"Weekly MVP"})
 TASK_OPEN_STATUSES = frozenset({"To Do", "Planned", "In Progress"})
 
@@ -604,6 +616,8 @@ def _member_stats(
         "levels_complete": _levels_complete(member, tiers, topics, cfg, rating_for_gates),
         "weekly_mvp": mvp_weeks,
         "solved_ratings": [p.effective for p in solved],
+        "solved_topics": [p.topic_ids for p in solved],
+        "topic_tiers": dict(tiers),
     }
 
 
@@ -717,19 +731,31 @@ def _update_teams(repo: Repo) -> None:
         )
 
 
+def _goal_links(goal: dict, topics: list[Topic]) -> dict[str, Any]:
+    """The link arguments of ``goals.current_value`` for one goal row: its Linked Topics, and the
+    ids of the topics of its Linked Level (None when the goal has no Linked Level)."""
+    level_ids = get_relation(goal, S.P_Goals.LINKED_LEVEL)
+    level_topic_ids = None
+    if level_ids:
+        level_topic_ids = [t.id for t in topics if level_ids[0] in t.level_ids]
+    return {"topic_ids": get_relation(goal, S.P_Goals.LINKED_TOPICS), "level_topic_ids": level_topic_ids}
+
+
 def _update_goals(ctx: Context, repo: Repo, results: dict[str, MemberResult], members: list[Member]) -> None:
     by_id = {m.id: m for m in members}
+    topics = repo.topics()
     for goal in repo.rows(S.DB_GOALS):
         metric = get_select(goal, S.P_Goals.METRIC) or ""
         threshold_value = get_number(goal, S.P_Goals.THRESHOLD_RATING)
         threshold = int(threshold_value) if threshold_value is not None else None
+        links = _goal_links(goal, topics)
         try:
             if get_select(goal, S.P_Goals.SCOPE) == "Team":
                 team_ids = get_relation(goal, S.P_Goals.TEAM)
                 if not team_ids:
                     continue
                 values = [
-                    goals.current_value(metric, results[m.id].stats, threshold)
+                    goals.current_value(metric, results[m.id].stats, threshold, **links)
                     for m in members
                     if team_ids[0] in m.team_ids and m.id in results
                 ]
@@ -740,7 +766,7 @@ def _update_goals(ctx: Context, repo: Repo, results: dict[str, MemberResult], me
                 member_ids = get_relation(goal, S.P_Goals.MEMBER)
                 if not member_ids or member_ids[0] not in results or member_ids[0] not in by_id:
                     continue
-                current = goals.current_value(metric, results[member_ids[0]].stats, threshold)
+                current = goals.current_value(metric, results[member_ids[0]].stats, threshold, **links)
         except ValueError as exc:
             log.warning("goal %s skipped: %s", get_title(goal, S.P_Goals.TITLE), exc)
             continue

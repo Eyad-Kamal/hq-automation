@@ -391,7 +391,7 @@ def _ensure_report(
         return existing, False
     mvp_name = mvp.name if mvp else "—"
     props = {
-        S.P_WeeklyReports.TITLE: nt.p_title(f"📰 Week of {week_begin.isoformat()}"),
+        S.P_WeeklyReports.TITLE: nt.p_title(f"Week of {week_begin.isoformat()}"),
         S.P_WeeklyReports.WEEK_START: nt.p_date(week_begin, with_time=False),
         S.P_WeeklyReports.WEEK_LABEL: nt.p_text(label),
         S.P_WeeklyReports.CLUB_POINTS: nt.p_number(club["points"]),

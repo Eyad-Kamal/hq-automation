@@ -76,7 +76,7 @@ def test_daily_creates_one_practice_task_per_member_and_is_idempotent() -> None:
         "CF-1000C | https://cf/1000/C",
         "CF-1000D | https://cf/1000/D",
     ], "solved and unrated problems are excluded; picks are sorted by rating"
-    assert task["properties"][S.P_Tasks.TITLE]["title"][0]["text"]["content"] == "🎯 Greedy & Constructive: 3 problems"
+    assert task["properties"][S.P_Tasks.TITLE]["title"][0]["text"]["content"] == "Greedy & Constructive: 3 problems"
     assert w.notion.blocks[task["id"]], "the picks are also listed as bullets in the page body"
 
     tasks_before = len(w.notion.rows(S.DB_TASKS))

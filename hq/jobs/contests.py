@@ -176,7 +176,7 @@ def _create_contest_tasks(ctx: Context, contest_page: dict, members: list) -> in
             continue
         props = member_task_props(
             member,
-            title=f"🏆 {name}",
+            title=name,
             task_type="Contest",
             status="Planned",
             due=start,

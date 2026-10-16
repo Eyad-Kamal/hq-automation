@@ -157,8 +157,9 @@ Do not delete rows. The important ones:
 | `IMPORT_MAX_CREATES` | 400 | Most new rows one import run may create. The rest is imported by later runs, so a large first backfill takes several runs |
 | `UPSOLVE_WINDOW_DAYS` | 7 | Upsolve reminders only for contests that ended within this many days. Older open auto Upsolve tasks become Skipped |
 | `AUTO_PRACTICE_TASKS` | 0 | 1 = create the automatic daily Topic Practice task for each trainee (picked from the learning queue). 0 = off: coaches assign topic practice. Existing auto practice tasks are still skipped when overdue |
-| `LEETCODE_DAILY_TASKS` | 1 | 1 = create one "💡 LeetCode daily" task per active trainee for LeetCode's daily challenge. It becomes Done when the trainee solves that problem. 0 = off |
+| `LEETCODE_DAILY_TASKS` | 1 | 1 = create one "LeetCode daily" task per active trainee for LeetCode's daily challenge. It becomes Done when the trainee solves that problem. 0 = off |
 | `ICON_BACKFILL_PER_RUN` | 300 | Most empty row icons set per run, one row from each database in turn (the onboard job reports the counts in the Sync Log) (the icons are real logos where one exists, otherwise emoji). Icons the user set are never replaced. 0 = off for existing rows; new rows still get their icon |
+| `TITLE_FIX_PER_RUN` | 200 | Most Tasks and Weekly Reports titles cleaned per run (the old emoji prefix is removed; the row icon shows it now). 0 = off |
 | `DAILY_LOG_DAYS` | 60 | Daily Log days recomputed per member (back from today) |
 | `WEEKLY_BACKFILL_WEEKS` | 12 | Complete past weeks whose Weekly Summary rows are kept filled (no reports or MVP for older weeks) |
 | `DASHBOARDS_AUTO` | 1 | 1 = create a personal dashboard page for each active member with an empty Dashboard URL. 0 = off |
