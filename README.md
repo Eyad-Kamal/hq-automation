@@ -280,6 +280,7 @@ Common messages:
   Cairo); after that a Warning is written and no task is created.
 - **Cumulative Points.** The Daily Log needs a Number property named `Cumulative Points`. It is the running
   total of points from solves that have a Solved On date; a solve without a date is not in any day.
+- **Form helper columns.** The "Log a problem" form may write its answers to its own question columns on Problems: "Who are you?" (person), "How did you solve it?" (multi-select), "Rating (1)" (number) and "Difficulty (if no rating)" (text). Recompute's form bridge copies them into Member, Mode, Rating, Difficulty and Status, only where the real column is empty, before the Who/Team fill and scoring. A trainee is matched by Members → Person. Missing helper columns are skipped. Details: `form rows bridged` and `form rows without a matching member`.
 - **Icons.** New rows get their icon when a job creates them. Existing rows are filled in by the auto run
   (up to `ICON_BACKFILL_PER_RUN` per run), except Sync Log rows, which get an icon only when created.
   Personal dashboard pages get their icon only when created. Icons are Notion external images (judge

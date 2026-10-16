@@ -216,6 +216,14 @@ class P_Problems:
     EFFECTIVE_RATING = "Effective Rating"
     POINTS = "Points"
     RATING_BUCKET = "Rating Bucket"
+    # Optional form helper columns (not in the spec). The "Log a problem" form may write its
+    # answers here instead of the real columns; recompute's form bridge copies them into
+    # Member, Mode, Rating, Difficulty and Status (empty targets only). A helper missing from
+    # the live schema is skipped silently.
+    FORM_WHO = "Who are you?"  # person (Notion user): matched to Members."Person"
+    FORM_HOW = "How did you solve it?"  # multi_select: Practice, Live Contest, Virtual, Upsolve, With Editorial / Hint
+    FORM_RATING = "Rating (1)"  # number
+    FORM_DIFFICULTY = "Difficulty (if no rating)"  # rich_text: Easy/Medium/Hard, or a rating such as 1500
 
 
 class P_Contests:

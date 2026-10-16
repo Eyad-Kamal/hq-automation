@@ -39,6 +39,7 @@ Team totals and goals are only recomputed on full runs (no --member filter).
 from __future__ import annotations
 
 import logging
+import re
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import date, timedelta
@@ -63,16 +64,18 @@ from hq.repo import (
     get_formula,
     get_multi,
     get_number,
+    get_people,
     get_relation,
     get_select,
     get_status,
     get_text,
     get_title,
     get_url,
+    is_blank,
     is_lc_daily_task,
 )
 from hq.schema import ConfigKey as K
-from hq.schema import Mode
+from hq.schema import Difficulty, Mode
 from hq.timeutil import week_label, week_start
 
 log = logging.getLogger("hq.jobs.recompute")
@@ -403,6 +406,7 @@ def run(ctx: Context) -> JobResult:
     errors: list[str] = []
     duplicates: list[str] = []
 
+    form_bridged, form_unmatched = _bridge_form_answers(repo)  # before grouping and Who/Team, so form rows count this run
     who_fixed = _fill_who_team(repo, members)
     season = season_rules(ctx)
     routing = TopicRouting(
@@ -428,6 +432,8 @@ def run(ctx: Context) -> JobResult:
         f"members recomputed: {len(results)}/{len(members)}",
         f"writes: {items}",
         f"Who/Team filled or corrected: {who_fixed}",
+        f"form rows bridged: {form_bridged}",
+        *([f"form rows without a matching member: {form_unmatched} (fill Members → Person)"] if form_unmatched else []),
         f"season start: {season.start.isoformat() if season.start else 'none'}; "
         f"in-season flags changed: {flags_written} (capped: {'yes' if flags_capped else 'no'})",
         f"topics routed: {routing.written} (capped: {'yes' if routing.capped else 'no'})",
@@ -560,6 +566,99 @@ def _recompute_member(
     _award_badges(repo, member, stat_values, today)
     _sync_practice_tasks(repo, member)
     return MemberResult(stats=stat_values, solved=solved)
+
+
+FORM_MODES = (Mode.PRACTICE, Mode.LIVE, Mode.VIRTUAL, Mode.UPSOLVE, Mode.EDITORIAL)
+FORM_DIFFICULTIES = (Difficulty.EASY, Difficulty.MEDIUM, Difficulty.HARD)
+_FORM_RATING_TEXT = re.compile(r"\d{3,4}")
+
+
+def _option_key(text: str) -> str:
+    """Case-insensitive option text with spaces around "/" ignored ("With Editorial / Hint")."""
+    return re.sub(r"\s*/\s*", "/", " ".join(text.split())).lower()
+
+
+def _person_key(user_id: str) -> str:
+    return user_id.replace("-", "").strip().lower()
+
+
+def _form_changes(row: dict, helpers: set[str], members: list[Member]) -> tuple[dict[str, Any], bool]:
+    """Writes that bridge one Problems row's form answers, and whether its member is unmatched.
+
+    Each rule fills only a blank target. Targets already changed by an earlier rule count as
+    filled, so the rules see the values they will write (Rating from "Rating (1)" stops the
+    text rule). A row is a form row only when at least one helper column has an answer.
+    """
+    who_users = get_people(row, S.P_Problems.FORM_WHO) if S.P_Problems.FORM_WHO in helpers else []
+    how = get_multi(row, S.P_Problems.FORM_HOW) if S.P_Problems.FORM_HOW in helpers else []
+    form_rating = get_number(row, S.P_Problems.FORM_RATING) if S.P_Problems.FORM_RATING in helpers else None
+    diff_text = get_text(row, S.P_Problems.FORM_DIFFICULTY).strip() if S.P_Problems.FORM_DIFFICULTY in helpers else ""
+    if not (who_users or how or form_rating is not None or diff_text):
+        return {}, False
+
+    changes: dict[str, Any] = {}
+
+    def blank(prop: str) -> bool:
+        return prop not in changes and is_blank(nt.prop(row, prop))
+
+    unmatched = False
+    # 1. Member from "Who are you?" (Members."Person" contains the user).
+    if who_users and blank(S.P_Problems.MEMBER):
+        wanted = {_person_key(u) for u in who_users}
+        matches = [m for m in members if wanted & {_person_key(p) for p in m.person_ids}]
+        if len(matches) == 1:
+            changes[S.P_Problems.MEMBER] = nt.p_relation([matches[0].id])
+        else:
+            unmatched = True
+            if len(matches) > 1:
+                log.warning("form row %s: %d members share that Person; leaving Member empty", row.get("id"), len(matches))
+    # 2. Mode from the first "How did you solve it?" option.
+    if how and blank(S.P_Problems.MODE):
+        key = _option_key(how[0])
+        mode = next((m for m in FORM_MODES if _option_key(m) == key), None)
+        if mode is not None:
+            changes[S.P_Problems.MODE] = nt.p_select(mode)
+    # 3. Rating from "Rating (1)".
+    if form_rating is not None and form_rating > 0 and blank(S.P_Problems.RATING):
+        changes[S.P_Problems.RATING] = nt.p_number(int(form_rating))
+    # 4. Difficulty (or a rating typed as text) from "Difficulty (if no rating)".
+    if diff_text:
+        named = next((d for d in FORM_DIFFICULTIES if d.lower() == diff_text.lower()), None)
+        if named is not None:
+            if blank(S.P_Problems.DIFFICULTY) and blank(S.P_Problems.RATING):
+                changes[S.P_Problems.DIFFICULTY] = nt.p_select(named)
+        elif _FORM_RATING_TEXT.fullmatch(diff_text) and blank(S.P_Problems.RATING):
+            changes[S.P_Problems.RATING] = nt.p_number(int(diff_text))
+    # 5. Form rows have no status question, so they are solved.
+    if blank(S.P_Problems.STATUS):
+        changes[S.P_Problems.STATUS] = nt.p_status("Solved")
+    return changes, unmatched
+
+
+def _bridge_form_answers(repo: Repo) -> tuple[int, int]:
+    """Copy the form helper answers of every Problems row into the real columns (P_Problems.FORM_*).
+
+    Runs before member grouping and the Who/Team fill, so a form row is scored in the same run.
+    Helper columns missing from the live schema are skipped. Returns (rows changed, form rows
+    whose trainee could not be matched to a Member).
+    """
+    try:
+        live = set(repo.data_source_properties(S.DB_PROBLEMS))
+    except Exception as exc:  # noqa: BLE001 - the bridge is optional; a failed schema read skips it
+        log.warning("could not read the Problems schema; form bridge skipped: %s", exc)
+        return 0, 0
+    helpers = live & {S.P_Problems.FORM_WHO, S.P_Problems.FORM_HOW, S.P_Problems.FORM_RATING, S.P_Problems.FORM_DIFFICULTY}
+    if not helpers:
+        return 0, 0
+    members = repo.members()
+    bridged = 0
+    unmatched = 0
+    for row in repo.rows(S.DB_PROBLEMS):
+        changes, missing = _form_changes(row, helpers, members)
+        unmatched += 1 if missing else 0
+        if changes and repo.sync(S.DB_PROBLEMS, row, changes, fill_only=True):
+            bridged += 1
+    return bridged, unmatched
 
 
 def _fill_who_team(repo: Repo, members: list[Member]) -> int:
