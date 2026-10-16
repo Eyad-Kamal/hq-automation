@@ -1,12 +1,13 @@
 """Command line entry point: ``python -m hq.main <job> [--force] [--dry-run] [--member NAME]``.
 
-Jobs: auto (default in CI), onboard, contests, alerts, imports, recompute, daily, weekly,
-backfill-weekly (Weekly Summary rows for the last WEEKLY_BACKFILL_WEEKS weeks; no reports or MVP).
+Jobs: auto (default in CI), onboard, contests, alerts, imports, recompute, daily, dashboards, weekly,
+backfill-weekly (Weekly Summary rows for the last WEEKLY_BACKFILL_WEEKS weeks; no reports or MVP),
+cleanup (trash a deleted member's leftover rows and dashboard; MEMBER_CLEANUP).
 
 ``auto`` runs, in this order:
   onboard -> contests -> alerts -> [imports + recompute, when the last import is
   more than 25 minutes old] -> [daily, when not yet run today (Cairo)] ->
-  [weekly, after Saturday 00:10 Cairo and not yet run this week].
+  [weekly, after Saturday 00:10 Cairo and not yet run this week] -> cleanup (last).
 ``--force`` ignores those "due" checks. A Sync Log row is written when a job changed items or did not end OK, and a
 failing job never stops the others. The exit code is 1 when any job ended with
 the result "Error".
@@ -32,7 +33,7 @@ import requests
 
 from hq import config, notify
 from hq.jobs import ERROR, Context, JobResult, execute
-from hq.jobs import alerts, contests, daily, dashboards, imports, onboard, recompute, weekly
+from hq.jobs import alerts, cleanup, contests, daily, dashboards, imports, onboard, recompute, weekly
 from hq.notion import Notion, load_data_source_ids
 from hq.repo import Repo
 from hq.sources import atcoder, codeforces, leetcode
@@ -48,6 +49,7 @@ JOBS: dict[str, Callable[[Context], JobResult]] = {
     "weekly": weekly.run,
     "backfill-weekly": weekly.backfill_run,
     "dashboards": dashboards.run,
+    "cleanup": cleanup.run,
 }
 ALIASES: dict[str, str] = {"import": "imports"}
 CHOICES = ("auto", *JOBS, *ALIASES)
@@ -172,6 +174,8 @@ def run_auto(ctx: Context) -> list[JobResult]:
     results.append(execute(ctx, "dashboards", lambda c: dashboards.run(c, repair_now=recomputed)))
     if ctx.force or weekly.weekly_due(ctx):
         results.append(execute(ctx, "weekly", weekly.run))
+    # Last: a member's leftovers go only after the run has finished with them (see hq.jobs.cleanup).
+    results.append(execute(ctx, "cleanup", cleanup.run))
     return results
 
 

@@ -166,6 +166,8 @@ Do not delete rows. The important ones:
 | `TOPIC_ROUTE_PER_RUN` | 300 | Most Problems rows whose Topics recompute rewrites per run. Same-band topics are filled in roadmap order (the earlier topic reaches Competent first). Rows you edit by hand are never rewritten. 0 = no rewrites |
 | `WEEKLY_BACKFILL_WEEKS` | 12 | Complete past weeks whose Weekly Summary rows are kept filled (no reports or MVP for older weeks) |
 | `DASHBOARDS_AUTO` | 1 | 1 = create a personal dashboard page for each active member with an empty Dashboard URL. 0 = off |
+| `MEMBER_CLEANUP` | 1 | 1 = after a Members row is deleted, trash that member's leftover rows and dashboard, and remove the name from the Who and Team lists. Acts only after two runs at least 15 minutes apart. 0 = off |
+| `CLEANUP_PER_RUN` | 300 | Most pages (rows and dashboards) the cleanup job trashes per run. Trashed pages stay in Notion's Trash for 30 days |
 | `FREEZE_EVERY` / `FREEZE_MAX` | 7 / 2 | A freeze is earned per 7 active days, up to 2 |
 | `TIER_*`, `BAND_*_FACTOR`, `MODE_*`, `GATE_L1..L4` | see the blueprint | Mastery, scoring and level gates |
 | `ADMIN_USER_ID` | empty | Notion user id mentioned on each weekly report. Leave empty to skip the mention. Find your id with the Notion API (`GET /v1/users`, using the integration token). This path is not verified in this repository. |
@@ -197,6 +199,7 @@ Every run (every 10 minutes) does, in order:
    without one, and once per Cairo day (also right after a recompute, and on `--force`) creates any linked view
    that is missing. Failed views are listed with Notion's error text in the Sync Log.
 7. **weekly**: only after Saturday 00:10 (Cairo time), once per week.
+8. **cleanup**: last. After a Members row is deleted, trashes that member's leftover rows and dashboard (never rows still linked to a live member), and removes the name from the Who and Team lists. A name is acted on only after two runs at least 15 minutes apart. Switch `MEMBER_CLEANUP`. Details in the Sync Log.
 
 Every job can run any number of times. Each record has a stable key, so reruns update or skip
 instead of duplicating. Your own edits are kept: the import fills only empty fields and never

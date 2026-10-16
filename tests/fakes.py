@@ -49,6 +49,12 @@ class FakeNotion:
         self.title_props: dict[str, str] = {}  # ds id -> live title property name (default: the name the rows use)
         self._nb = 0  # block id counter for appended blocks
         self._n = 0
+        # Cleanup job: select options are kept after their rows go (as Notion keeps them until removed).
+        self.options: dict[str, dict[str, list[dict[str, Any]]]] = {}  # ds id -> select prop -> options
+        self.trashed: list[str] = []  # page ids moved to the trash
+        self.trash_faults: set[str] = set()  # page ids whose trash call fails with HTTP 500 (injected)
+        self.option_updates: list[tuple[str, str, list[str]]] = []  # (ds id, prop, option names kept)
+        self.option_update_faults = False  # True: every data source update fails with HTTP 400 (injected)
 
     # -- Notion client surface ------------------------------------------------
     def query(self, ds_id: str, filter: Any = None, sorts: Any = None) -> list[dict[str, Any]]:  # noqa: A002
@@ -75,6 +81,7 @@ class FakeNotion:
             raise NotionError("POST /pages -> HTTP 500 (injected: nothing stored)")
         page = {"id": page_id, "parent": {"type": "data_source_id", "data_source_id": ds_id}, "properties": copy.deepcopy(properties), "icon": copy.deepcopy(icon)}
         self.tables[ds_id].append(page)
+        self._note_selects(ds_id, properties)
         self.creates.append((ds_id, page_id))
         if children:
             self.blocks.setdefault(page_id, []).extend(copy.deepcopy(list(children)))
@@ -85,13 +92,54 @@ class FakeNotion:
     def block_children(self, block_id: str, page_size: int = 100) -> list[dict[str, Any]]:
         return [{"id": f"{block_id}-b{i}", **copy.deepcopy(b)} for i, b in enumerate(self.blocks.get(block_id, []))][:page_size]
 
+    def all_block_children(self, block_id: str) -> list[dict[str, Any]]:
+        return self.block_children(block_id, page_size=10_000)
+
+    def trash_page(self, page_id: str) -> dict[str, Any]:
+        if page_id in self.trash_faults:
+            raise NotionError("PATCH /pages -> HTTP 500 (injected)", status=500)
+        self.trashed.append(page_id)
+        for ds_id, rows in list(self.tables.items()):
+            self.tables[ds_id] = [r for r in rows if r["id"] != page_id]
+        for parent, blocks in list(self.blocks.items()):
+            self.blocks[parent] = [b for b in blocks if b.get("id") != page_id]
+        return {"id": page_id, "in_trash": True}
+
+    def update_data_source(self, ds_id: str, properties: dict[str, Any]) -> dict[str, Any]:
+        if self.option_update_faults:
+            raise NotionError("PATCH /data_sources -> HTTP 400 (injected)", status=400)
+        for name, meta in properties.items():
+            select = (meta or {}).get("select") if isinstance(meta, dict) else None
+            if select is None:
+                continue
+            kept = [
+                {"id": o.get("id") or f"{ds_id}-{name}-new{i}", "name": o["name"], "color": o.get("color") or "default"}
+                for i, o in enumerate(select.get("options") or [])
+            ]
+            self.options.setdefault(ds_id, {})[name] = kept
+            self.option_updates.append((ds_id, name, [o["name"] for o in kept]))
+        return {"id": ds_id}
+
+    def _note_selects(self, ds_id: str, properties: dict[str, Any]) -> None:
+        """Keep every select option a row has used (Notion adds options when a row sets one)."""
+        bucket = self.options.setdefault(ds_id, {})
+        for name, value in properties.items():
+            if not (isinstance(value, dict) and "select" in value):
+                continue
+            options = bucket.setdefault(name, [])
+            chosen = value.get("select") or {}
+            if chosen.get("name") and not any(o["name"] == chosen["name"] for o in options):
+                options.append({"id": f"{ds_id}-{name}-{len(options) + 1}", "name": chosen["name"], "color": "default"})
+
     def update_page(self, page_id: str, properties: dict[str, Any] | None = None, *, icon: Any = None) -> dict[str, Any]:
         page = self.page(page_id)
         if page is None:
             raise KeyError(page_id)
         if properties:
-            self._check_title_key(next(d for d, rows in self.tables.items() if page in rows), properties)
+            ds = next(d for d, rows in self.tables.items() if page in rows)
+            self._check_title_key(ds, properties)
             page["properties"].update(copy.deepcopy(properties))
+            self._note_selects(ds, properties)
             self.updates.append((page_id, copy.deepcopy(properties)))
         if icon is not None:
             page["icon"] = copy.deepcopy(icon)
@@ -126,7 +174,7 @@ class FakeNotion:
     def retrieve_data_source(self, ds_id: str) -> dict[str, Any]:
         # Property ids are the name with a prefix; enough for the dashboard code under test.
         # The title property is typed "title" (a property whose row values hold a title); others are "x".
-        names: set[str] = set(self.declared.get(ds_id, set()))
+        names: set[str] = set(self.declared.get(ds_id, set())) | set(self.options.get(ds_id, {}))  # the schema keeps select properties with no rows
         titles: set[str] = set()
         for row in self.tables.get(ds_id, []):
             for name, value in row.get("properties", {}).items():
@@ -136,13 +184,20 @@ class FakeNotion:
         if ds_id in self.title_props:
             names.add(self.title_props[ds_id])
             titles = {self.title_props[ds_id]}
-        return {"id": ds_id, "properties": {n: {"id": f"id-{n}", "type": "title" if n in titles else "x"} for n in sorted(names)}}
+        props: dict[str, Any] = {}
+        for n in sorted(names):
+            if n in self.options.get(ds_id, {}):
+                props[n] = {"id": f"id-{n}", "type": "select", "select": {"options": copy.deepcopy(self.options[ds_id][n])}}
+            else:
+                props[n] = {"id": f"id-{n}", "type": "title" if n in titles else "x"}
+        return {"id": ds_id, "properties": props}
 
     def create_child_page(self, parent_page_id: str, title: str, children: Any = None, icon: Any = None) -> dict[str, Any]:
         self._n += 1
         page_id = f"{self._n:032x}"  # real page ids are 32 hex digits; the dashboard URL carries one
         self.child_pages.append((parent_page_id, title, copy.deepcopy(list(children or []))))
         self.child_icons.append(copy.deepcopy(icon))
+        self.blocks.setdefault(parent_page_id, []).append({"id": page_id, "type": "child_page", "child_page": {"title": title}})
         if children:
             self.blocks.setdefault(page_id, []).extend(copy.deepcopy(list(children)))
         return {"id": page_id, "url": f"https://www.notion.so/Dashboard-{page_id}"}

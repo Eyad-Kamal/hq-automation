@@ -621,6 +621,8 @@ class ConfigKey:
     SEASON_START = "SEASON_START"  # Config "Date" (or Value YYYY-MM-DD): global season start; empty = no season
     SEASON_FLAG_PER_RUN = "SEASON_FLAG_PER_RUN"  # most In Season checkboxes written per recompute run
     TOPIC_ROUTE_PER_RUN = "TOPIC_ROUTE_PER_RUN"  # most Problems rows whose Topics recompute rewrites per run
+    MEMBER_CLEANUP = "MEMBER_CLEANUP"  # 1 = after a Members row is deleted, trash its leftover rows and dashboard (cleanup job); 0 = off
+    CLEANUP_PER_RUN = "CLEANUP_PER_RUN"  # most pages (rows and dashboards) the cleanup job trashes per run
 
 
 # Source Key prefix of the automatic "LeetCode daily" task: "lcdaily:<date>:<member id>".

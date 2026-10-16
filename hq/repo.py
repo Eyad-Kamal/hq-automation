@@ -626,6 +626,46 @@ class Repo:
             return
         self.notion.delete_block(block_id)
 
+    def trash(self, db: str, page: Json) -> None:
+        """Move a row to the Notion trash (dry-run aware). The row leaves the cache, so later
+        reads in the run see it gone, as Notion's query does."""
+        self.writes += 1
+        if self.dry_run:
+            self._record(f"trash {db}: {_title_of(page.get('properties') or {}) or page['id']}")
+        else:
+            self.notion.trash_page(page["id"])
+        rows = self._rows.get(db)
+        if rows is not None:
+            self._rows[db] = [p for p in rows if p["id"] != page["id"]]
+            self._by_id.get(db, {}).pop(page["id"], None)
+        for slot in [s for s in self._index if s[0] == db]:
+            del self._index[slot]
+
+    def trash_page_id(self, page_id: str) -> None:
+        """Move a page that is not a row of a cached table (a dashboard page) to the trash."""
+        self.writes += 1
+        if self.dry_run:
+            self._record(f"trash page {page_id}")
+            return
+        self.notion.trash_page(page_id)
+
+    def child_pages(self, page_id: str) -> list[tuple[str, str]]:
+        """(id, title) of the child pages of a page (a read; also in dry-run)."""
+        found: list[tuple[str, str]] = []
+        for block in self.notion.all_block_children(page_id):
+            if block.get("type") == "child_page":
+                found.append((str(block.get("id")), str((block.get("child_page") or {}).get("title") or "")))
+        return found
+
+    def update_select_options(self, db: str, prop: str, options: list[Json]) -> None:
+        """Replace the option list of a select property of a database's data source (dry-run aware)."""
+        self.writes += 1
+        properties = {prop: {"select": {"options": options}}}
+        if self.dry_run:
+            self._record(f"select options {db}.{prop}: {len(options)} option(s) kept")
+            return
+        self.notion.update_data_source(self.ds(db), properties)
+
     def _record(self, message: str) -> None:
         self.write_log.append(message)
         log.info("[dry-run] %s", message)

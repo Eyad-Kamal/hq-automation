@@ -29,7 +29,14 @@ STATE_LAST_IMPORT = "STATE_LAST_IMPORT"
 STATE_LAST_DAILY = "STATE_LAST_DAILY"
 STATE_LAST_WEEKLY = "STATE_LAST_WEEKLY"
 STATE_LAST_DASHBOARD_REPAIR = "STATE_LAST_DASHBOARD_REPAIR"  # Cairo day of the last dashboard view repair pass
-STATE_KEYS: tuple[str, ...] = (STATE_LAST_IMPORT, STATE_LAST_DAILY, STATE_LAST_WEEKLY, STATE_LAST_DASHBOARD_REPAIR)
+STATE_CLEANUP_PENDING = "STATE_CLEANUP_PENDING"  # JSON {"names": {departed name: ISO time first seen}}, see hq.jobs.cleanup
+STATE_KEYS: tuple[str, ...] = (
+    STATE_LAST_IMPORT,
+    STATE_LAST_DAILY,
+    STATE_LAST_WEEKLY,
+    STATE_LAST_DASHBOARD_REPAIR,
+    STATE_CLEANUP_PENDING,
+)
 STATE_DESCRIPTION = "Automation state written by the jobs. Do not edit by hand."
 
 DEFAULTS: dict[str, Any] = {
@@ -75,6 +82,8 @@ DEFAULTS: dict[str, Any] = {
     "SEASON_START": None,  # a date, or None = no season (see _season_start)
     "SEASON_FLAG_PER_RUN": 400,
     "TOPIC_ROUTE_PER_RUN": 300,
+    "MEMBER_CLEANUP": 1,
+    "CLEANUP_PER_RUN": 300,
 }
 
 _ISO_DAY = re.compile(r"\d{4}-\d{2}-\d{2}")

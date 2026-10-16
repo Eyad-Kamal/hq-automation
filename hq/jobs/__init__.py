@@ -8,6 +8,7 @@ Jobs:
   recompute - daily logs, streaks, member totals, mastery, goals, achievements, teams
   daily     - daily practice tasks, skipped-task cleanup, upsolve reminders
   weekly    - weekly summaries, MVP, weekly report page
+  cleanup   - after a member row is deleted: trash its leftover rows and dashboard, remove the name from selects
 
 ``execute`` runs one job, turns exceptions into an "Error" result, and writes one
 Sync Log row. A failing job never stops the others.

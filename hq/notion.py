@@ -228,6 +228,32 @@ class Notion:
         page = self._call("GET", f"/blocks/{block_id}/children", params={"page_size": page_size})
         return list(page.get("results", []))
 
+    def all_block_children(self, block_id: str) -> list[Json]:
+        """Every child block of a page, following pagination (the cleanup job lists a parent's child pages)."""
+        results: list[Json] = []
+        cursor: str | None = None
+        while True:
+            params: dict[str, Any] = {"page_size": APPEND_CHILDREN_LIMIT}
+            if cursor is not None:
+                params["start_cursor"] = cursor
+            page = self._call("GET", f"/blocks/{block_id}/children", params=params)
+            results.extend(page.get("results", []))
+            cursor = page.get("next_cursor")
+            if not page.get("has_more") or not cursor:
+                return results
+
+    def trash_page(self, page_id: str) -> Json:
+        """Move a page or row to the Notion trash (recoverable for 30 days). ``in_trash`` is the
+        field for NOTION_VERSION 2025-09-03; a 2022-06-28 client would send ``archived`` instead.
+        Trashing is idempotent, so the usual 5xx retries are safe."""
+        return self._call("PATCH", f"/pages/{page_id}", body={"in_trash": True})
+
+    def update_data_source(self, ds_id: str, properties: Json) -> Json:
+        """Patch a data source's property definitions. For a select, the options sent are meant to
+        replace the whole option list, so an option left out is removed (not verified live: the
+        cleanup job logs a warning if Notion refuses the change, and carries on)."""
+        return self._call("PATCH", f"/data_sources/{ds_id}", body={"properties": properties})
+
     def update_page(self, page_id: str, properties: Json | None = None, *, icon: Json | None = None) -> Json:
         """Patch the properties and/or the icon of a page or row. ``icon`` is sent at the top
         level of the request body, as the Notion API expects."""
