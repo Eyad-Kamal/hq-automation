@@ -1,0 +1,804 @@
+﻿Page ID,Job,Details,Started,Result,Items,Run
+40660538-f4c5-8118-80d3-fbfb5b0eec8e,recompute,"members recomputed: 9/9
+writes: 5
+Who/Team filled or corrected: 0
+form rows bridged: 0
+season start: none; in-season flags changed: 1 (capped: no)
+topics routed: 0 (capped: no)",2026-10-27T11:04:00.000+00:00,OK,5,recompute 2026-10-27T11:04:54+00:00
+40660538-f4c5-81aa-8df1-e616e51cb735,import,"members imported cleanly: 9/9
+placeholder contests renamed: 0
+contest Total Problems filled: 0
+problems: 1 new, 0 filled
+contest entries: 0 new (contests created: 0)
+rating rows: 0 new
+creates this run: 1, skipped by IMPORT_MAX_CREATES: 0",2026-10-27T11:04:00.000+00:00,OK,1,import 2026-10-27T11:04:54+00:00
+40660538-f4c5-81c6-a786-d7dfb2311a0e,recompute,"members recomputed: 9/9
+writes: 72
+Who/Team filled or corrected: 0
+form rows bridged: 0
+season start: none; in-season flags changed: 0 (capped: no)
+topics routed: 0 (capped: no)",2026-10-27T00:49:00.000+00:00,OK,72,recompute 2026-10-27T00:49:33+00:00
+40660538-f4c5-8154-909d-ea3af8854073,contests,"contests: 0 created, 0 updated, 0 phase changes
+contest tasks created: 0 (contests ticked: 0)
+contest tasks marked Missed: 1",2026-10-27T00:49:00.000+00:00,OK,1,contests 2026-10-27T00:49:33+00:00
+40560538-f4c5-8188-9d97-e10c8060dd93,daily,"overdue auto tasks skipped: 8
+topic practice tasks: off (AUTO_PRACTICE_TASKS is 0)
+LeetCode daily tasks created: 9
+upsolve reminders created: 0
+stale upsolve reminders skipped (contest ended before the window): 0",2026-10-26T21:40:00.000+00:00,OK,17,daily 2026-10-26T21:40:22+00:00
+40560538-f4c5-814b-9057-ffe21a365cb8,recompute,"members recomputed: 9/9
+writes: 29
+Who/Team filled or corrected: 0
+form rows bridged: 0
+season start: none; in-season flags changed: 12 (capped: no)
+topics routed: 1 (capped: no)",2026-10-26T21:40:00.000+00:00,OK,29,recompute 2026-10-26T21:40:22+00:00
+40560538-f4c5-81bd-836d-e1bf3342d31f,import,"members imported cleanly: 9/9
+placeholder contests renamed: 0
+contest Total Problems filled: 0
+problems: 3 new, 0 filled
+contest entries: 0 new (contests created: 0)
+rating rows: 1 new
+creates this run: 4, skipped by IMPORT_MAX_CREATES: 0",2026-10-26T21:40:00.000+00:00,OK,4,import 2026-10-26T21:40:22+00:00
+40560538-f4c5-815e-b155-e4fdea4ecf50,contests,"contests: 2 created, 0 updated, 0 phase changes
+contest tasks created: 0 (contests ticked: 0)
+contest tasks marked Missed: 0",2026-10-26T21:40:00.000+00:00,OK,2,contests 2026-10-26T21:40:22+00:00
+40560538-f4c5-81d9-bee2-e18a97126146,recompute,"members recomputed: 9/9
+writes: 32
+Who/Team filled or corrected: 0
+form rows bridged: 0
+season start: none; in-season flags changed: 8 (capped: no)
+topics routed: 7 (capped: no)",2026-10-26T17:17:00.000+00:00,OK,32,recompute 2026-10-26T17:17:00+00:00
+40560538-f4c5-8123-a3a0-e6f6e4eb2154,import,"members imported cleanly: 9/9
+placeholder contests renamed: 0
+contest Total Problems filled: 1
+problems: 7 new, 0 filled
+contest entries: 1 new (contests created: 0)
+rating rows: 0 new
+creates this run: 8, skipped by IMPORT_MAX_CREATES: 0",2026-10-26T17:17:00.000+00:00,OK,9,import 2026-10-26T17:17:00+00:00
+40560538-f4c5-8192-b481-e540f25adc14,contests,"contests: 1 created, 0 updated, 1 phase changes
+contest tasks created: 0 (contests ticked: 0)
+contest tasks marked Missed: 0",2026-10-26T17:17:00.000+00:00,OK,2,contests 2026-10-26T17:17:00+00:00
+40560538-f4c5-81c6-881c-c5e3a07baa87,contests,"contests: 1 created, 0 updated, 0 phase changes
+contest tasks created: 0 (contests ticked: 0)
+contest tasks marked Missed: 0",2026-10-26T05:10:00.000+00:00,OK,1,contests 2026-10-26T05:10:09+00:00
+40560538-f4c5-81c4-88df-f80e9b7f3f38,recompute,"members recomputed: 9/9
+writes: 9
+Who/Team filled or corrected: 0
+form rows bridged: 0
+season start: none; in-season flags changed: 0 (capped: no)
+topics routed: 0 (capped: no)",2026-10-26T00:28:00.000+00:00,OK,9,recompute 2026-10-26T00:28:58+00:00
+40560538-f4c5-81ae-bcf2-cec64643e1a6,contests,"contests: 1 created, 0 updated, 0 phase changes
+contest tasks created: 0 (contests ticked: 0)
+contest tasks marked Missed: 0",2026-10-26T00:28:00.000+00:00,OK,1,contests 2026-10-26T00:28:58+00:00
+40460538-f4c5-8159-ac28-f25d61fd053c,daily,"overdue auto tasks skipped: 8
+topic practice tasks: off (AUTO_PRACTICE_TASKS is 0)
+LeetCode daily tasks created: 9
+upsolve reminders created: 0
+stale upsolve reminders skipped (contest ended before the window): 0",2026-10-25T22:21:00.000+00:00,OK,17,daily 2026-10-25T22:21:13+00:00
+40460538-f4c5-817d-a416-c76791561c1e,recompute,"members recomputed: 9/9
+writes: 20
+Who/Team filled or corrected: 0
+form rows bridged: 0
+season start: none; in-season flags changed: 9 (capped: no)
+topics routed: 0 (capped: no)",2026-10-25T22:21:00.000+00:00,OK,20,recompute 2026-10-25T22:21:13+00:00
+40460538-f4c5-814b-b25c-e292a39234a0,contests,"contests: 0 created, 0 updated, 0 phase changes
+contest tasks created: 0 (contests ticked: 0)
+contest tasks marked Missed: 1",2026-10-25T22:21:00.000+00:00,OK,1,contests 2026-10-25T22:21:13+00:00
+40460538-f4c5-8126-856d-df81610bf3f6,recompute,"members recomputed: 9/9
+writes: 7
+Who/Team filled or corrected: 0
+form rows bridged: 0
+season start: none; in-season flags changed: 1 (capped: no)
+topics routed: 1 (capped: no)",2026-10-25T19:58:00.000+00:00,OK,7,recompute 2026-10-25T19:58:25+00:00
+40460538-f4c5-8189-b05f-e034306756ed,import,"members imported cleanly: 9/9
+placeholder contests renamed: 0
+contest Total Problems filled: 0
+problems: 1 new, 0 filled
+contest entries: 0 new (contests created: 0)
+rating rows: 0 new
+creates this run: 1, skipped by IMPORT_MAX_CREATES: 0",2026-10-25T19:58:00.000+00:00,OK,1,import 2026-10-25T19:58:25+00:00
+40460538-f4c5-8197-b3ea-fef103d305ee,recompute,"members recomputed: 9/9
+writes: 5
+Who/Team filled or corrected: 0
+form rows bridged: 0
+season start: none; in-season flags changed: 1 (capped: no)
+topics routed: 0 (capped: no)",2026-10-25T17:42:00.000+00:00,OK,5,recompute 2026-10-25T17:42:34+00:00
+40460538-f4c5-8134-a8fc-dd11cd224363,import,"members imported cleanly: 9/9
+placeholder contests renamed: 0
+contest Total Problems filled: 0
+problems: 1 new, 0 filled
+contest entries: 0 new (contests created: 0)
+rating rows: 0 new
+creates this run: 1, skipped by IMPORT_MAX_CREATES: 0",2026-10-25T17:42:00.000+00:00,OK,1,import 2026-10-25T17:42:34+00:00
+40460538-f4c5-8154-a1a1-e5c03c080a7c,contests,"contests: 1 created, 0 updated, 1 phase changes
+contest tasks created: 1 (contests ticked: 1)
+contest tasks marked Missed: 0",2026-10-25T17:42:00.000+00:00,OK,3,contests 2026-10-25T17:42:34+00:00
+40460538-f4c5-8124-8570-d009ad375eca,contests,"contests: 0 created, 0 updated, 1 phase changes
+contest tasks created: 0 (contests ticked: 0)
+contest tasks marked Missed: 0",2026-10-25T14:22:00.000+00:00,OK,1,contests 2026-10-25T14:22:06+00:00
+40460538-f4c5-81dd-a3c3-e163590c8787,contests,"contests: 1 created, 0 updated, 1 phase changes
+contest tasks created: 0 (contests ticked: 0)
+contest tasks marked Missed: 0",2026-10-25T05:46:00.000+00:00,OK,2,contests 2026-10-25T05:46:14+00:00
+40460538-f4c5-8130-bf24-f77b562a796b,recompute,"members recomputed: 9/9
+writes: 9
+Who/Team filled or corrected: 0
+form rows bridged: 0
+season start: none; in-season flags changed: 0 (capped: no)
+topics routed: 0 (capped: no)",2026-10-25T00:56:00.000+00:00,OK,9,recompute 2026-10-25T00:56:13+00:00
+40360538-f4c5-8158-b6cb-c88e2b8dbd3d,daily,"overdue auto tasks skipped: 8
+topic practice tasks: off (AUTO_PRACTICE_TASKS is 0)
+LeetCode daily tasks created: 9
+upsolve reminders created: 0
+stale upsolve reminders skipped (contest ended before the window): 1",2026-10-24T22:59:00.000+00:00,OK,18,daily 2026-10-24T22:59:53+00:00
+40360538-f4c5-81c3-b063-c3418ed651ef,recompute,"members recomputed: 9/9
+writes: 20
+Who/Team filled or corrected: 0
+form rows bridged: 0
+season start: none; in-season flags changed: 9 (capped: no)
+topics routed: 0 (capped: no)",2026-10-24T22:59:00.000+00:00,OK,20,recompute 2026-10-24T22:59:53+00:00
+40360538-f4c5-8161-a199-d6ebd6c536cb,recompute,"members recomputed: 9/9
+writes: 8
+Who/Team filled or corrected: 0
+form rows bridged: 0
+season start: none; in-season flags changed: 1 (capped: no)
+topics routed: 1 (capped: no)",2026-10-24T20:59:00.000+00:00,OK,8,recompute 2026-10-24T20:59:22+00:00
+40360538-f4c5-819a-97d4-d1e552349285,import,"members imported cleanly: 9/9
+placeholder contests renamed: 0
+contest Total Problems filled: 0
+problems: 1 new, 0 filled
+contest entries: 0 new (contests created: 0)
+rating rows: 0 new
+creates this run: 1, skipped by IMPORT_MAX_CREATES: 0",2026-10-24T20:59:00.000+00:00,OK,1,import 2026-10-24T20:59:22+00:00
+40360538-f4c5-8119-a785-f43b555e1732,contests,"contests: 0 created, 0 updated, 0 phase changes
+contest tasks created: 0 (contests ticked: 0)
+contest tasks marked Missed: 10",2026-10-24T20:59:00.000+00:00,OK,10,contests 2026-10-24T20:59:22+00:00
+40360538-f4c5-817b-bd57-f4864ce4aa6d,recompute,"members recomputed: 9/9
+writes: 5
+Who/Team filled or corrected: 0
+form rows bridged: 0
+season start: none; in-season flags changed: 2 (capped: no)
+topics routed: 0 (capped: no)",2026-10-24T18:21:00.000+00:00,OK,5,recompute 2026-10-24T18:21:08+00:00
+40360538-f4c5-8116-9d94-efe6a31b414f,import,"members imported cleanly: 9/9
+placeholder contests renamed: 0
+contest Total Problems filled: 0
+problems: 2 new, 0 filled
+contest entries: 0 new (contests created: 0)
+rating rows: 0 new
+creates this run: 2, skipped by IMPORT_MAX_CREATES: 0",2026-10-24T18:21:00.000+00:00,OK,2,import 2026-10-24T18:21:08+00:00
+40360538-f4c5-811b-95a3-cdba66de604d,contests,"contests: 0 created, 0 updated, 1 phase changes
+contest tasks created: 0 (contests ticked: 0)
+contest tasks marked Missed: 0",2026-10-24T18:21:00.000+00:00,OK,1,contests 2026-10-24T18:21:08+00:00
+40360538-f4c5-8147-bc3f-fbee12fd3205,contests,"contests: 0 created, 0 updated, 3 phase changes
+contest tasks created: 1 (contests ticked: 1)
+contest tasks marked Missed: 0",2026-10-24T15:35:00.000+00:00,OK,4,contests 2026-10-24T15:35:37+00:00
+40360538-f4c5-81ba-a82e-d78da60f0b06,recompute,"members recomputed: 9/9
+writes: 8
+Who/Team filled or corrected: 0
+form rows bridged: 0
+season start: none; in-season flags changed: 1 (capped: no)
+topics routed: 1 (capped: no)",2026-10-24T11:58:00.000+00:00,OK,8,recompute 2026-10-24T11:58:54+00:00
+40360538-f4c5-8142-9ba7-d38369f97973,import,"members imported cleanly: 9/9
+placeholder contests renamed: 0
+contest Total Problems filled: 0
+problems: 1 new, 0 filled
+contest entries: 0 new (contests created: 0)
+rating rows: 0 new
+creates this run: 1, skipped by IMPORT_MAX_CREATES: 0",2026-10-24T11:58:00.000+00:00,OK,1,import 2026-10-24T11:58:54+00:00
+40360538-f4c5-8111-a9bb-e5524ae70f7d,alerts,"alerts posted: 1, emails sent: 0
+SMBC Programming Contest #2 (AtCoder Beginner Contest 481）: comment not posted
+SMBC Programming Contest #2 (AtCoder Beginner Contest 481）: comment failed (NotionError)",2026-10-24T11:58:00.000+00:00,Warning,1,alerts 2026-10-24T11:58:54+00:00
+40360538-f4c5-81b1-bb49-d64d447b53e1,contests,"contests: 0 created, 0 updated, 1 phase changes
+contest tasks created: 0 (contests ticked: 0)
+contest tasks marked Missed: 0",2026-10-24T11:58:00.000+00:00,OK,1,contests 2026-10-24T11:58:54+00:00
+40260538-f4c5-81f4-be9b-eb3a9373536b,weekly,"week 2026-10-17 (Sat): 9 member summaries
+report: created
+MVP: Hamza Sakr
+history weeks: 36 older summary row(s) written",2026-10-23T23:50:00.000+00:00,OK,51,weekly 2026-10-23T23:50:45+00:00
+40260538-f4c5-81ae-b72f-cc6882ddb1dd,recompute,"members recomputed: 9/9
+writes: 9
+Who/Team filled or corrected: 0
+form rows bridged: 0
+season start: none; in-season flags changed: 0 (capped: no)
+topics routed: 0 (capped: no)",2026-10-23T23:50:00.000+00:00,OK,9,recompute 2026-10-23T23:50:45+00:00
+40260538-f4c5-81e0-aa43-ce5e28bdc9eb,daily,"overdue auto tasks skipped: 8
+topic practice tasks: off (AUTO_PRACTICE_TASKS is 0)
+LeetCode daily tasks created: 9
+upsolve reminders created: 0
+stale upsolve reminders skipped (contest ended before the window): 0",2026-10-23T21:06:00.000+00:00,OK,17,daily 2026-10-23T21:06:08+00:00
+40260538-f4c5-81ac-9a51-e9616e637e49,recompute,"members recomputed: 9/9
+writes: 22
+Who/Team filled or corrected: 0
+form rows bridged: 0
+season start: none; in-season flags changed: 9 (capped: no)
+topics routed: 0 (capped: no)",2026-10-23T21:06:00.000+00:00,OK,22,recompute 2026-10-23T21:06:08+00:00
+40260538-f4c5-81b3-bf9d-c1d72a91f53d,contests,"contests: 0 created, 1 updated, 0 phase changes
+contest tasks created: 0 (contests ticked: 1)
+contest tasks marked Missed: 0",2026-10-23T17:58:00.000+00:00,OK,1,contests 2026-10-23T17:58:18+00:00
+40260538-f4c5-8120-990e-ce319ce29e7b,recompute,"members recomputed: 9/9
+writes: 9
+Who/Team filled or corrected: 0
+form rows bridged: 0
+season start: none; in-season flags changed: 3 (capped: no)
+topics routed: 1 (capped: no)",2026-10-23T13:51:00.000+00:00,OK,9,recompute 2026-10-23T13:51:45+00:00
+40260538-f4c5-815e-9e71-ed3301638b6f,import,"members imported cleanly: 9/9
+placeholder contests renamed: 0
+contest Total Problems filled: 0
+problems: 3 new, 0 filled
+contest entries: 0 new (contests created: 0)
+rating rows: 0 new
+creates this run: 3, skipped by IMPORT_MAX_CREATES: 0",2026-10-23T13:51:00.000+00:00,OK,3,import 2026-10-23T13:51:45+00:00
+40260538-f4c5-8199-aa63-cc7cf7fc8ba8,contests,"contests: 0 created, 0 updated, 0 phase changes
+contest tasks created: 10 (contests ticked: 2)
+contest tasks marked Missed: 0",2026-10-23T13:51:00.000+00:00,OK,10,contests 2026-10-23T13:51:45+00:00
+40260538-f4c5-811e-8690-fe5185d92bcc,recompute,"members recomputed: 9/9
+writes: 186
+Who/Team filled or corrected: 0
+form rows bridged: 0
+season start: none; in-season flags changed: 0 (capped: no)
+topics routed: 0 (capped: no)",2026-10-23T08:51:00.000+00:00,OK,186,recompute 2026-10-23T08:51:01+00:00
+40260538-f4c5-810e-91a2-ffd9ea50d3b5,recompute,"members recomputed: 9/9
+writes: 19
+Who/Team filled or corrected: 0
+form rows bridged: 0
+season start: none; in-season flags changed: 2 (capped: no)
+topics routed: 2 (capped: no)",2026-10-23T03:42:00.000+00:00,OK,19,recompute 2026-10-23T03:42:35+00:00
+40260538-f4c5-8111-8db1-e97f399f305d,import,"members imported cleanly: 9/9
+placeholder contests renamed: 0
+contest Total Problems filled: 0
+problems: 2 new, 0 filled
+contest entries: 0 new (contests created: 0)
+rating rows: 0 new
+creates this run: 2, skipped by IMPORT_MAX_CREATES: 0",2026-10-23T03:42:00.000+00:00,OK,2,import 2026-10-23T03:42:35+00:00
+40160538-f4c5-8182-a6af-f5a3a916a23e,daily,"overdue auto tasks skipped: 8
+topic practice tasks: off (AUTO_PRACTICE_TASKS is 0)
+LeetCode daily tasks created: 9
+upsolve reminders created: 0
+stale upsolve reminders skipped (contest ended before the window): 0",2026-10-22T23:54:00.000+00:00,OK,17,daily 2026-10-22T23:54:03+00:00
+40160538-f4c5-8132-b026-e530e9c92119,recompute,"members recomputed: 9/9
+writes: 20
+Who/Team filled or corrected: 0
+form rows bridged: 0
+season start: none; in-season flags changed: 9 (capped: no)
+topics routed: 0 (capped: no)",2026-10-22T23:54:00.000+00:00,OK,20,recompute 2026-10-22T23:54:03+00:00
+40160538-f4c5-81fb-b170-fba3f8a426ce,recompute,"members recomputed: 9/9
+writes: 315
+Who/Team filled or corrected: 0
+form rows bridged: 0
+season start: none; in-season flags changed: 1 (capped: no)
+topics routed: 1 (capped: no)",2026-10-22T20:53:00.000+00:00,OK,315,recompute 2026-10-22T20:53:22+00:00
+40160538-f4c5-812c-8635-f4d9cb8040d7,import,"members imported cleanly: 9/9
+placeholder contests renamed: 0
+contest Total Problems filled: 0
+problems: 1 new, 0 filled
+contest entries: 0 new (contests created: 0)
+rating rows: 0 new
+creates this run: 1, skipped by IMPORT_MAX_CREATES: 0",2026-10-22T20:53:00.000+00:00,OK,1,import 2026-10-22T20:53:22+00:00
+40160538-f4c5-8124-a5e5-f03cf2c3a9d2,recompute,"members recomputed: 9/9
+writes: 9
+Who/Team filled or corrected: 0
+form rows bridged: 0
+season start: none; in-season flags changed: 5 (capped: no)
+topics routed: 0 (capped: no)",2026-10-22T17:53:00.000+00:00,OK,9,recompute 2026-10-22T17:53:01+00:00
+40160538-f4c5-819e-b32b-d2d81224cb67,import,"members imported cleanly: 9/9
+placeholder contests renamed: 0
+contest Total Problems filled: 0
+problems: 5 new, 0 filled
+contest entries: 0 new (contests created: 0)
+rating rows: 0 new
+creates this run: 5, skipped by IMPORT_MAX_CREATES: 0",2026-10-22T17:53:00.000+00:00,OK,5,import 2026-10-22T17:53:01+00:00
+40160538-f4c5-8168-8382-e8a65596ad8b,recompute,"members recomputed: 9/9
+writes: 9
+Who/Team filled or corrected: 0
+form rows bridged: 0
+season start: none; in-season flags changed: 0 (capped: no)
+topics routed: 0 (capped: no)",2026-10-22T01:57:00.000+00:00,OK,9,recompute 2026-10-22T01:57:56+00:00
+40060538-f4c5-811d-89b0-ce82106b05f0,daily,"overdue auto tasks skipped: 8
+topic practice tasks: off (AUTO_PRACTICE_TASKS is 0)
+LeetCode daily tasks created: 9
+upsolve reminders created: 0
+stale upsolve reminders skipped (contest ended before the window): 0",2026-10-21T23:44:00.000+00:00,OK,17,daily 2026-10-21T23:44:42+00:00
+40060538-f4c5-81a1-a7e9-e7713e69d1e1,recompute,"members recomputed: 9/9
+writes: 20
+Who/Team filled or corrected: 0
+form rows bridged: 0
+season start: none; in-season flags changed: 9 (capped: no)
+topics routed: 0 (capped: no)",2026-10-21T23:44:00.000+00:00,OK,20,recompute 2026-10-21T23:44:42+00:00
+40060538-f4c5-81d3-a83b-c7ef60dab21d,recompute,"members recomputed: 9/9
+writes: 7
+Who/Team filled or corrected: 0
+form rows bridged: 0
+season start: none; in-season flags changed: 1 (capped: no)
+topics routed: 1 (capped: no)",2026-10-21T06:39:00.000+00:00,OK,7,recompute 2026-10-21T06:39:17+00:00
+40060538-f4c5-81de-bc43-fb850e8ac3c6,import,"members imported cleanly: 9/9
+placeholder contests renamed: 0
+contest Total Problems filled: 0
+problems: 1 new, 0 filled
+contest entries: 0 new (contests created: 0)
+rating rows: 0 new
+creates this run: 1, skipped by IMPORT_MAX_CREATES: 0",2026-10-21T06:39:00.000+00:00,OK,1,import 2026-10-21T06:39:17+00:00
+40060538-f4c5-81c2-bb17-d64f8114c981,recompute,"members recomputed: 9/9
+writes: 9
+Who/Team filled or corrected: 0
+form rows bridged: 0
+season start: none; in-season flags changed: 0 (capped: no)
+topics routed: 0 (capped: no)",2026-10-21T01:51:00.000+00:00,OK,9,recompute 2026-10-21T01:51:31+00:00
+3ff60538-f4c5-818c-b8ee-d4ad8ad01307,daily,"overdue auto tasks skipped: 8
+topic practice tasks: off (AUTO_PRACTICE_TASKS is 0)
+LeetCode daily tasks created: 9
+upsolve reminders created: 0
+stale upsolve reminders skipped (contest ended before the window): 0",2026-10-20T23:24:00.000+00:00,OK,17,daily 2026-10-20T23:24:54+00:00
+3ff60538-f4c5-8158-bc7c-c565fc98f243,recompute,"members recomputed: 9/9
+writes: 25
+Who/Team filled or corrected: 0
+form rows bridged: 0
+season start: none; in-season flags changed: 10 (capped: no)
+topics routed: 1 (capped: no)",2026-10-20T23:24:00.000+00:00,OK,25,recompute 2026-10-20T23:24:54+00:00
+3ff60538-f4c5-81dc-9d91-da002db35a58,import,"members imported cleanly: 9/9
+placeholder contests renamed: 0
+contest Total Problems filled: 0
+problems: 1 new, 0 filled
+contest entries: 0 new (contests created: 0)
+rating rows: 0 new
+creates this run: 1, skipped by IMPORT_MAX_CREATES: 0",2026-10-20T23:24:00.000+00:00,OK,1,import 2026-10-20T23:24:54+00:00
+3ff60538-f4c5-811a-a7a6-fbedc7f6720e,contests,"contests: 3 created, 0 updated, 0 phase changes
+contest tasks created: 0 (contests ticked: 0)
+contest tasks marked Missed: 0",2026-10-20T12:14:00.000+00:00,OK,3,contests 2026-10-20T12:14:04+00:00
+3ff60538-f4c5-81da-b45a-e46aa867d70e,recompute,"members recomputed: 9/9
+writes: 17
+Who/Team filled or corrected: 0
+form rows bridged: 0
+season start: none; in-season flags changed: 3 (capped: no)
+topics routed: 3 (capped: no)",2026-10-20T06:42:00.000+00:00,OK,17,recompute 2026-10-20T06:42:40+00:00
+3ff60538-f4c5-81b3-aefe-eeaf9d926cf8,import,"members imported cleanly: 9/9
+placeholder contests renamed: 0
+contest Total Problems filled: 0
+problems: 3 new, 0 filled
+contest entries: 0 new (contests created: 0)
+rating rows: 0 new
+creates this run: 3, skipped by IMPORT_MAX_CREATES: 0",2026-10-20T06:42:00.000+00:00,OK,3,import 2026-10-20T06:42:40+00:00
+3ff60538-f4c5-8147-acc2-efd95111c6dc,recompute,"members recomputed: 9/9
+writes: 15
+Who/Team filled or corrected: 0
+form rows bridged: 0
+season start: none; in-season flags changed: 1 (capped: no)
+topics routed: 1 (capped: no)",2026-10-20T01:47:00.000+00:00,OK,15,recompute 2026-10-20T01:47:52+00:00
+3ff60538-f4c5-81ee-b3c3-ed30debe7dff,import,"members imported cleanly: 9/9
+placeholder contests renamed: 0
+contest Total Problems filled: 0
+problems: 1 new, 0 filled
+contest entries: 0 new (contests created: 0)
+rating rows: 0 new
+creates this run: 1, skipped by IMPORT_MAX_CREATES: 0",2026-10-20T01:47:00.000+00:00,OK,1,import 2026-10-20T01:47:52+00:00
+3fe60538-f4c5-8195-b653-eb7627dc7d82,daily,"overdue auto tasks skipped: 8
+topic practice tasks: off (AUTO_PRACTICE_TASKS is 0)
+LeetCode daily tasks created: 9
+upsolve reminders created: 0
+stale upsolve reminders skipped (contest ended before the window): 0",2026-10-19T23:09:00.000+00:00,OK,17,daily 2026-10-19T23:09:59+00:00
+3fe60538-f4c5-8158-84bd-fc39258aff56,recompute,"members recomputed: 9/9
+writes: 20
+Who/Team filled or corrected: 0
+form rows bridged: 0
+season start: none; in-season flags changed: 9 (capped: no)
+topics routed: 0 (capped: no)",2026-10-19T23:09:00.000+00:00,OK,20,recompute 2026-10-19T23:09:59+00:00
+3fe60538-f4c5-8145-84b3-de6350a5a7ac,contests,"contests: 1 created, 0 updated, 0 phase changes
+contest tasks created: 0 (contests ticked: 0)
+contest tasks marked Missed: 0",2026-10-19T14:03:00.000+00:00,OK,1,contests 2026-10-19T14:03:29+00:00
+3fe60538-f4c5-8147-b74a-f56b1d795c6d,recompute,"members recomputed: 9/9
+writes: 8
+Who/Team filled or corrected: 0
+form rows bridged: 0
+season start: none; in-season flags changed: 1 (capped: no)
+topics routed: 1 (capped: no)",2026-10-19T06:46:00.000+00:00,OK,8,recompute 2026-10-19T06:46:55+00:00
+3fe60538-f4c5-81b4-a5bd-eb0e9023d423,import,"members imported cleanly: 9/9
+placeholder contests renamed: 0
+contest Total Problems filled: 0
+problems: 1 new, 0 filled
+contest entries: 0 new (contests created: 0)
+rating rows: 0 new
+creates this run: 1, skipped by IMPORT_MAX_CREATES: 0",2026-10-19T06:46:00.000+00:00,OK,1,import 2026-10-19T06:46:55+00:00
+3fd60538-f4c5-81e2-bb06-fbe9cefd497b,recompute,"members recomputed: 9/9
+writes: 9
+Who/Team filled or corrected: 0
+form rows bridged: 0
+season start: none; in-season flags changed: 0 (capped: no)
+topics routed: 0 (capped: no)",2026-10-18T23:31:00.000+00:00,OK,9,recompute 2026-10-18T23:31:50+00:00
+3fd60538-f4c5-815a-b4f5-ea05e2156f22,daily,"overdue auto tasks skipped: 8
+topic practice tasks: off (AUTO_PRACTICE_TASKS is 0)
+LeetCode daily tasks created: 9
+upsolve reminders created: 1
+stale upsolve reminders skipped (contest ended before the window): 0",2026-10-18T21:24:00.000+00:00,OK,18,daily 2026-10-18T21:24:25+00:00
+3fd60538-f4c5-8137-a7b5-d7547662f554,recompute,"members recomputed: 9/9
+writes: 25
+Who/Team filled or corrected: 0
+form rows bridged: 0
+season start: none; in-season flags changed: 10 (capped: no)
+topics routed: 1 (capped: no)",2026-10-18T21:24:00.000+00:00,OK,25,recompute 2026-10-18T21:24:25+00:00
+3fd60538-f4c5-81d2-873e-c2422d351961,import,"members imported cleanly: 9/9
+placeholder contests renamed: 0
+contest Total Problems filled: 0
+problems: 1 new, 0 filled
+contest entries: 0 new (contests created: 0)
+rating rows: 0 new
+creates this run: 1, skipped by IMPORT_MAX_CREATES: 0",2026-10-18T21:24:00.000+00:00,OK,1,import 2026-10-18T21:24:25+00:00
+3fd60538-f4c5-8193-9d35-ee1829a71f12,contests,"contests: 0 created, 1 updated, 0 phase changes
+contest tasks created: 0 (contests ticked: 0)
+contest tasks marked Missed: 0",2026-10-18T16:52:00.000+00:00,OK,1,contests 2026-10-18T16:52:31+00:00
+3fd60538-f4c5-81f5-ab0b-d377c98acbb5,recompute,"members recomputed: 9/9
+writes: 11
+Who/Team filled or corrected: 0
+form rows bridged: 0
+season start: none; in-season flags changed: 1 (capped: no)
+topics routed: 1 (capped: no)",2026-10-18T05:31:00.000+00:00,OK,11,recompute 2026-10-18T05:31:02+00:00
+3fd60538-f4c5-8150-9cdf-f3a4f7e0759e,import,"members imported cleanly: 9/9
+placeholder contests renamed: 0
+contest Total Problems filled: 0
+problems: 1 new, 0 filled
+contest entries: 0 new (contests created: 0)
+rating rows: 0 new
+creates this run: 1, skipped by IMPORT_MAX_CREATES: 0",2026-10-18T05:31:00.000+00:00,OK,1,import 2026-10-18T05:31:02+00:00
+3fd60538-f4c5-8155-b2e4-d63ce7c2d116,contests,"contests: 1 created, 0 updated, 1 phase changes
+contest tasks created: 0 (contests ticked: 0)
+contest tasks marked Missed: 0",2026-10-18T05:31:00.000+00:00,OK,2,contests 2026-10-18T05:31:02+00:00
+3fd60538-f4c5-8146-9a8c-dbfb24b0b471,import,"members imported cleanly: 8/9
+placeholder contests renamed: 0
+contest Total Problems filled: 0
+problems: 0 new, 0 filled
+contest entries: 0 new (contests created: 0)
+rating rows: 0 new
+creates this run: 0, skipped by IMPORT_MAX_CREATES: 0
+Eyad Kamal: Codeforces solves failed; Last Sync kept",2026-10-18T00:58:00.000+00:00,Warning,0,import 2026-10-18T00:58:46+00:00
+3fd60538-f4c5-8180-bd27-fd71d98976a3,contests,"contests: 0 created, 0 updated, 0 phase changes
+contest tasks created: 0 (contests ticked: 0)
+contest tasks marked Missed: 1",2026-10-18T00:58:00.000+00:00,OK,1,contests 2026-10-18T00:58:46+00:00
+3fc60538-f4c5-8100-b7d0-c94d228b18c3,recompute,"members recomputed: 9/9
+writes: 15
+Who/Team filled or corrected: 0
+form rows bridged: 0
+season start: none; in-season flags changed: 1 (capped: no)
+topics routed: 1 (capped: no)",2026-10-17T23:05:00.000+00:00,OK,15,recompute 2026-10-17T23:05:31+00:00
+3fc60538-f4c5-8100-a150-d2eb73eb7813,import,"members imported cleanly: 9/9
+placeholder contests renamed: 0
+contest Total Problems filled: 0
+problems: 1 new, 0 filled
+contest entries: 0 new (contests created: 0)
+rating rows: 0 new
+creates this run: 1, skipped by IMPORT_MAX_CREATES: 0",2026-10-17T23:05:00.000+00:00,OK,1,import 2026-10-17T23:05:31+00:00
+3fc60538-f4c5-817c-a013-ff7de54dd3ab,daily,"overdue auto tasks skipped: 0
+topic practice tasks: off (AUTO_PRACTICE_TASKS is 0)
+LeetCode daily tasks created: 9
+upsolve reminders created: 0
+stale upsolve reminders skipped (contest ended before the window): 0",2026-10-17T21:03:00.000+00:00,OK,9,daily 2026-10-17T21:03:15+00:00
+3fc60538-f4c5-8116-b6e8-fc615fbfbe8d,recompute,"members recomputed: 9/9
+writes: 21
+Who/Team filled or corrected: 0
+form rows bridged: 0
+season start: none; in-season flags changed: 9 (capped: no)
+topics routed: 0 (capped: no)",2026-10-17T21:03:00.000+00:00,OK,21,recompute 2026-10-17T21:03:15+00:00
+3fc60538-f4c5-81c7-8c87-fbfb5ee6e31f,contests,"contests: 0 created, 0 updated, 0 phase changes
+contest tasks created: 0 (contests ticked: 0)
+contest tasks marked Missed: 5",2026-10-17T21:03:00.000+00:00,OK,5,contests 2026-10-17T21:03:15+00:00
+3fc60538-f4c5-8194-b542-c5badbff02aa,recompute,"members recomputed: 9/9
+writes: 2
+Who/Team filled or corrected: 0
+form rows bridged: 0
+season start: none; in-season flags changed: 0 (capped: no)
+topics routed: 0 (capped: no)",2026-10-17T18:49:00.000+00:00,OK,2,recompute 2026-10-17T18:49:58+00:00
+3fc60538-f4c5-81d0-b51c-e82d08461143,contests,"contests: 0 created, 0 updated, 1 phase changes
+contest tasks created: 0 (contests ticked: 0)
+contest tasks marked Missed: 0",2026-10-17T18:49:00.000+00:00,OK,1,contests 2026-10-17T18:49:58+00:00
+3fc60538-f4c5-810d-b601-dbb01049ceda,recompute,"members recomputed: 9/9
+writes: 125
+Who/Team filled or corrected: 0
+form rows bridged: 0
+season start: none; in-season flags changed: 0 (capped: no)
+topics routed: 0 (capped: no)",2026-10-17T16:40:00.000+00:00,OK,125,recompute 2026-10-17T16:40:25+00:00
+3fc60538-f4c5-81dd-8c0e-f2f181f1c2aa,import,"members imported cleanly: 9/9
+placeholder contests renamed: 0
+contest Total Problems filled: 0
+problems: 0 new, 1 filled
+contest entries: 0 new (contests created: 0)
+rating rows: 0 new
+creates this run: 0, skipped by IMPORT_MAX_CREATES: 0",2026-10-17T16:40:00.000+00:00,OK,1,import 2026-10-17T16:40:25+00:00
+3fc60538-f4c5-8167-9ec8-f8927225a25b,dashboards,"dashboard pages created: 3
+views created on new pages: 24
+missing views repaired: 0",2026-10-17T15:33:00.000+00:00,OK,27,dashboards 2026-10-17T15:33:05+00:00
+3fc60538-f4c5-8186-b7b3-c2d04e2040a1,recompute,"members recomputed: 9/9
+writes: 897
+Who/Team filled or corrected: 0
+form rows bridged: 0
+season start: none; in-season flags changed: 386 (capped: no)
+topics routed: 181 (capped: no)",2026-10-17T15:33:00.000+00:00,OK,897,recompute 2026-10-17T15:33:05+00:00
+3fc60538-f4c5-814a-bde4-ec1b0d38d79f,import,"members imported cleanly: 9/9
+placeholder contests renamed: 0
+contest Total Problems filled: 5
+problems: 197 new, 0 filled
+contest entries: 6 new (contests created: 0)
+rating rows: 7 new
+creates this run: 210, skipped by IMPORT_MAX_CREATES: 0",2026-10-17T15:33:00.000+00:00,OK,215,import 2026-10-17T15:33:05+00:00
+3fc60538-f4c5-817d-ac6d-c60b4e04297f,contests,"contests: 1 created, 0 updated, 1 phase changes
+contest tasks created: 0 (contests ticked: 0)
+contest tasks marked Missed: 0",2026-10-17T15:33:00.000+00:00,OK,2,contests 2026-10-17T15:33:05+00:00
+3fc60538-f4c5-8100-a748-d2e6ee621885,onboard,"members checked: 9
+learning queue rows created: 135
+icons backfilled: 0; still without an icon: none
+emoji title prefixes removed: 0",2026-10-17T15:33:00.000+00:00,OK,138,onboard 2026-10-17T15:33:05+00:00
+3fc60538-f4c5-810a-9d2b-cd19223834a5,recompute,"members recomputed: 6/6
+writes: 7
+Who/Team filled or corrected: 0
+form rows bridged: 0
+season start: none; in-season flags changed: 1 (capped: no)
+topics routed: 1 (capped: no)",2026-10-17T13:48:00.000+00:00,OK,7,recompute 2026-10-17T13:48:13+00:00
+3fc60538-f4c5-8137-8f5a-f8ac33646a26,import,"members imported cleanly: 2/6
+placeholder contests renamed: 0
+contest Total Problems filled: 0
+problems: 1 new, 0 filled
+contest entries: 0 new (contests created: 0)
+rating rows: 0 new
+creates this run: 1, skipped by IMPORT_MAX_CREATES: 0
+Zeiad Kamal: AtCoder solves failed; Last Sync kept
+Hamza Sakr: AtCoder solves failed; Last Sync kept
+Abdelrahman: AtCoder solves failed; Last Sync kept
+Sahar Sameer: AtCoder solves failed; Last Sync kept",2026-10-17T13:48:00.000+00:00,Warning,1,import 2026-10-17T13:48:13+00:00
+3fc60538-f4c5-8137-bf3c-ecb01a5a4505,contests,"contests: 1 created, 0 updated, 1 phase changes
+contest tasks created: 0 (contests ticked: 0)
+contest tasks marked Missed: 0",2026-10-17T13:48:00.000+00:00,OK,2,contests 2026-10-17T13:48:13+00:00
+3fc60538-f4c5-814f-ab41-c7cfa06d5e2b,contests,"contests: 0 created, 0 updated, 1 phase changes
+contest tasks created: 0 (contests ticked: 0)
+contest tasks marked Missed: 0",2026-10-17T10:18:00.000+00:00,OK,1,contests 2026-10-17T10:18:53+00:00
+3fc60538-f4c5-81d0-b446-c88d67c3ad7e,recompute,"members recomputed: 6/6
+writes: 8
+Who/Team filled or corrected: 0
+form rows bridged: 0
+season start: none; in-season flags changed: 1 (capped: no)
+topics routed: 1 (capped: no)",2026-10-17T05:58:00.000+00:00,OK,8,recompute 2026-10-17T05:58:41+00:00
+3fc60538-f4c5-812d-8f53-f4b6bcd66f3c,import,"members imported cleanly: 6/6
+placeholder contests renamed: 0
+contest Total Problems filled: 0
+problems: 1 new, 0 filled
+contest entries: 0 new (contests created: 0)
+rating rows: 0 new
+creates this run: 1, skipped by IMPORT_MAX_CREATES: 0",2026-10-17T05:58:00.000+00:00,OK,1,import 2026-10-17T05:58:41+00:00
+3fb60538-f4c5-81d6-8795-e1dd6980ade1,weekly,"week 2026-10-10 (Sat): 6 member summaries
+report: created
+MVP: Hamza Sakr
+history weeks: 21 older summary row(s) written",2026-10-16T23:32:00.000+00:00,OK,33,weekly 2026-10-16T23:32:41+00:00
+3fb60538-f4c5-81a7-8701-de439ca0b781,recompute,"members recomputed: 6/6
+writes: 226
+Who/Team filled or corrected: 0
+form rows bridged: 0
+season start: none; in-season flags changed: 88 (capped: no)
+topics routed: 138 (capped: no)",2026-10-16T23:32:00.000+00:00,OK,226,recompute 2026-10-16T23:32:41+00:00
+3fb60538-f4c5-81a9-94b5-e474206dda7c,daily,"overdue auto tasks skipped: 6
+topic practice tasks: off (AUTO_PRACTICE_TASKS is 0)
+LeetCode daily tasks created: 0
+upsolve reminders created: 0
+stale upsolve reminders skipped (contest ended before the window): 0
+LeetCode daily: the question could not be read; no LeetCode daily tasks created",2026-10-16T21:05:00.000+00:00,Warning,6,daily 2026-10-16T21:05:48+00:00
+3fb60538-f4c5-814a-be94-cdf6a568738c,recompute,"members recomputed: 6/6
+writes: 784
+Who/Team filled or corrected: 0
+form rows bridged: 0
+season start: none; in-season flags changed: 400 (capped: yes)
+topics routed: 300 (capped: yes)",2026-10-16T21:05:00.000+00:00,OK,784,recompute 2026-10-16T21:05:48+00:00
+3fb60538-f4c5-811a-b11d-f7e0951f8807,import,"members imported cleanly: 6/6
+placeholder contests renamed: 0
+contest Total Problems filled: 0
+problems: 3 new, 0 filled
+contest entries: 0 new (contests created: 0)
+rating rows: 0 new
+creates this run: 3, skipped by IMPORT_MAX_CREATES: 0",2026-10-16T21:05:00.000+00:00,OK,3,import 2026-10-16T21:05:48+00:00
+3fb60538-f4c5-81ba-8a2a-d7e8fdcc6333,cleanup,"departed names pending: []
+confirmed: ['انا فكهاني و بموت ف الموز و المانجا ', '🧪 Demo Laila', '🧪 Demo Omar', '🧪 Demo Sara', '🧪 Team Alpha', '🧪 Team Beta']
+trashed: 135 (capped: no)
+dashboards trashed: 0
+select options removed: 23",2026-10-16T19:12:00.000+00:00,OK,158,cleanup 2026-10-16T19:12:39+00:00
+3fb60538-f4c5-8148-b33e-eb9e710d44fb,weekly,"week 2026-10-03 (Sat): 6 member summaries
+report: exists
+MVP: Hamza Sakr
+history weeks: 77 older summary row(s) written",2026-10-16T19:12:00.000+00:00,OK,85,weekly 2026-10-16T19:12:39+00:00
+3fb60538-f4c5-8182-9d7b-dfc016d2fcd1,dashboards,"dashboard pages created: 1
+views created on new pages: 8
+missing views repaired: 0",2026-10-16T19:12:00.000+00:00,OK,9,dashboards 2026-10-16T19:12:39+00:00
+3fb60538-f4c5-819b-ad54-d8c86c957d6b,daily,"overdue auto tasks skipped: 0
+topic practice tasks: off (AUTO_PRACTICE_TASKS is 0)
+LeetCode daily tasks created: 6
+upsolve reminders created: 0
+stale upsolve reminders skipped (contest ended before the window): 0",2026-10-16T19:12:00.000+00:00,OK,6,daily 2026-10-16T19:12:39+00:00
+3fb60538-f4c5-817e-87d6-cd8f313688bf,recompute,"members recomputed: 6/6
+writes: 1104
+Who/Team filled or corrected: 0
+form rows bridged: 0
+season start: none; in-season flags changed: 400 (capped: yes)
+topics routed: 300 (capped: yes)",2026-10-16T19:12:00.000+00:00,OK,1104,recompute 2026-10-16T19:12:39+00:00
+3fb60538-f4c5-81d4-b747-d774c151115f,import,"members imported cleanly: 6/6
+placeholder contests renamed: 0
+contest Total Problems filled: 74
+problems: 592 new, 0 filled
+contest entries: 81 new (contests created: 37)
+rating rows: 70 new
+creates this run: 780, skipped by IMPORT_MAX_CREATES: 0",2026-10-16T19:12:00.000+00:00,OK,817,import 2026-10-16T19:12:39+00:00
+3fb60538-f4c5-8139-8853-f816d5266fbc,contests,"contests: 0 created, 0 updated, 0 phase changes
+contest tasks created: 1 (contests ticked: 0)
+contest tasks marked Missed: 0",2026-10-16T19:12:00.000+00:00,OK,1,contests 2026-10-16T19:12:39+00:00
+3fb60538-f4c5-810c-844c-d6892f4fe73c,onboard,"members checked: 6
+learning queue rows created: 45
+icons backfilled: 0; still without an icon: none
+emoji title prefixes removed: 0",2026-10-16T19:12:00.000+00:00,OK,46,onboard 2026-10-16T19:12:39+00:00
+3fb60538-f4c5-8166-84c0-f57dd07d8c65,cleanup,"departed names pending: ['انا فكهاني و بموت ف الموز و المانجا ']
+confirmed: ['🧪 Demo Laila', '🧪 Demo Omar', '🧪 Demo Sara', '🧪 Team Alpha', '🧪 Team Beta']
+trashed: 300 (capped: yes)
+dashboards trashed: 0
+select options removed: 0",2026-10-16T18:11:00.000+00:00,OK,300,cleanup 2026-10-16T18:11:14+00:00
+3fb60538-f4c5-81ed-9af3-ed4c94f2daa6,recompute,"members recomputed: 5/5
+writes: 1538
+Who/Team filled or corrected: 608
+form rows bridged: 0
+season start: none; in-season flags changed: 400 (capped: yes)
+topics routed: 300 (capped: yes)",2026-10-16T18:11:00.000+00:00,OK,1538,recompute 2026-10-16T18:11:14+00:00
+3fb60538-f4c5-8175-927f-cdfdcbfd316d,import,"members imported cleanly: 1/5
+placeholder contests renamed: 0
+contest Total Problems filled: 42
+problems: 318 new, 400 filled
+contest entries: 44 new (contests created: 38)
+rating rows: 0 new
+creates this run: 400, skipped by IMPORT_MAX_CREATES: 677
+Hamza Sakr: create limit reached; the rest imports next run
+Abdelrahman: create limit reached; the rest imports next run
+Sahar Sameer: LeetCode solves failed; Last Sync kept
+Sahar Sameer: create limit reached; the rest imports next run
+Mohamed Ayman: create limit reached; the rest imports next run",2026-10-16T18:11:00.000+00:00,Warning,804,import 2026-10-16T18:11:14+00:00
+3fb60538-f4c5-81cb-8c35-c095c8839d8b,dashboards,"dashboard pages created: 3
+views created on new pages: 24
+missing views repaired: 0",2026-10-16T17:31:00.000+00:00,OK,27,dashboards 2026-10-16T17:31:47+00:00
+3fb60538-f4c5-8184-8a01-e1c81ab13c69,recompute,"members recomputed: 5/5
+writes: 1031
+Who/Team filled or corrected: 0
+form rows bridged: 0
+season start: none; in-season flags changed: 400 (capped: yes)
+topics routed: 300 (capped: yes)",2026-10-16T17:31:00.000+00:00,OK,1031,recompute 2026-10-16T17:31:47+00:00
+3fb60538-f4c5-81e3-87c7-c6239473d1bb,import,"members imported cleanly: 1/5
+placeholder contests renamed: 0
+contest Total Problems filled: 0
+problems: 400 new, 0 filled
+contest entries: 0 new (contests created: 0)
+rating rows: 0 new
+creates this run: 400, skipped by IMPORT_MAX_CREATES: 1000
+Hamza Sakr: create limit reached; the rest imports next run
+Abdelrahman: create limit reached; the rest imports next run
+Sahar Sameer: create limit reached; the rest imports next run
+Mohamed Ayman: create limit reached; the rest imports next run",2026-10-16T17:31:00.000+00:00,Warning,400,import 2026-10-16T17:31:47+00:00
+3fb60538-f4c5-816f-8a4d-dc7dcd04ba15,contests,"contests: 0 created, 0 updated, 0 phase changes
+contest tasks created: 3 (contests ticked: 0)
+contest tasks marked Missed: 0",2026-10-16T17:31:00.000+00:00,OK,3,contests 2026-10-16T17:31:47+00:00
+3fb60538-f4c5-81ea-81a6-cb8f55dc5dcd,onboard,"members checked: 5
+learning queue rows created: 135
+icons backfilled: 0; still without an icon: none
+emoji title prefixes removed: 0",2026-10-16T17:31:00.000+00:00,OK,138,onboard 2026-10-16T17:31:47+00:00
+3fb60538-f4c5-8122-97b4-d4233ed49950,dashboards,"dashboard pages created: 1
+views created on new pages: 8
+missing views repaired: 0",2026-10-16T16:42:00.000+00:00,OK,9,dashboards 2026-10-16T16:42:11+00:00
+3fb60538-f4c5-816d-8f7f-e2434a465b45,recompute,"members recomputed: 2/2
+writes: 1370
+Who/Team filled or corrected: 608
+season start: none; in-season flags changed: 281 (capped: no)
+topics routed: 300 (capped: yes)",2026-10-16T16:42:00.000+00:00,OK,1370,recompute 2026-10-16T16:42:11+00:00
+3fb60538-f4c5-814d-8e6e-c5d0d3dc54d8,import,"members imported cleanly: 1/2
+placeholder contests renamed: 0
+contest Total Problems filled: 0
+problems: 0 new, 0 filled
+contest entries: 0 new (contests created: 0)
+rating rows: 0 new
+creates this run: 1, skipped by IMPORT_MAX_CREATES: 0
+FAILED Mohamed Ayman: NotionError: POST /pages -> HTTP 400: {""object"":""error"",""status"":400,""code"":""validation_error"",""message"":""Problem is not a property that exists."",""request_id"":""cfa813be-b27b-4b63-97ee-b9ecd3abe05e""}",2026-10-16T16:42:00.000+00:00,Warning,0,import 2026-10-16T16:42:11+00:00
+3fb60538-f4c5-811f-b1fe-e42d74196582,contests,"contests: 0 created, 0 updated, 0 phase changes
+contest tasks created: 2 (contests ticked: 1)
+contest tasks marked Missed: 0",2026-10-16T16:42:00.000+00:00,OK,2,contests 2026-10-16T16:42:11+00:00
+3fb60538-f4c5-81da-9825-db9506b1e84d,onboard,"members checked: 2
+learning queue rows created: 45
+icons backfilled: 28 (Problems 28); still without an icon: none
+emoji title prefixes removed: 0",2026-10-16T16:42:00.000+00:00,OK,74,onboard 2026-10-16T16:42:11+00:00
+3fb60538-f4c5-8127-8b89-f6226175b3c4,recompute,"members recomputed: 4/4
+writes: 401
+Who/Team filled or corrected: 0
+season start: none; in-season flags changed: 400 (capped: yes)",2026-10-16T14:20:00.000+00:00,OK,401,recompute 2026-10-16T14:20:50+00:00
+3fb60538-f4c5-8175-942d-d75270daf941,onboard,"members checked: 4
+learning queue rows created: 0
+icons backfilled: 100 (Problems 100); still without an icon: Problems 29
+emoji title prefixes removed: 0",2026-10-16T14:20:00.000+00:00,OK,100,onboard 2026-10-16T14:20:50+00:00
+3fb60538-f4c5-8106-b714-ed9bd9ddc059,recompute,"members recomputed: 4/4
+writes: 404
+Who/Team filled or corrected: 0
+season start: none; in-season flags changed: 400 (capped: yes)",2026-10-16T13:39:00.000+00:00,OK,404,recompute 2026-10-16T13:39:12+00:00
+3fb60538-f4c5-81ca-9927-f7d7218e84d4,contests,"contests: 0 created, 0 updated, 0 phase changes
+contest tasks created: 4 (contests ticked: 1)
+contest tasks marked Missed: 0",2026-10-16T13:39:00.000+00:00,OK,4,contests 2026-10-16T13:39:12+00:00
+3fb60538-f4c5-81a9-b383-e67c9fdeb45b,onboard,"members checked: 4
+learning queue rows created: 0
+icons backfilled: 100 (Problems 100); still without an icon: Problems 129
+emoji title prefixes removed: 10",2026-10-16T13:39:00.000+00:00,OK,110,onboard 2026-10-16T13:39:12+00:00
+3fb60538-f4c5-8109-8a71-e535346f4395,onboard,"members checked: 4
+learning queue rows created: 0
+icons backfilled: 100 (Problems 100); still without an icon: Problems 229",2026-10-16T09:44:00.000+00:00,OK,100,onboard 2026-10-16T09:44:34+00:00
+3fb60538-f4c5-81cf-b50e-ff88640de21c,onboard,"members checked: 4
+learning queue rows created: 0
+icons backfilled: 100 (Problems 73, Learning Queue & Mastery 27); still without an icon: Problems 329",2026-10-16T05:09:00.000+00:00,OK,100,onboard 2026-10-16T05:09:11+00:00
+3fb60538-f4c5-81b3-b49a-c29e587174b8,onboard,"members checked: 4
+learning queue rows created: 0
+icons backfilled: 100 (Problems 50, Learning Queue & Mastery 50); still without an icon: Problems 402, Learning Queue & Mastery 27",2026-10-16T00:46:00.000+00:00,OK,100,onboard 2026-10-16T00:46:42+00:00
+3fa60538-f4c5-8121-9e59-c9ca9ba20745,recompute,"members recomputed: 4/4
+writes: 4
+Who/Team filled or corrected: 0",2026-10-15T22:42:00.000+00:00,OK,4,recompute 2026-10-15T22:42:44+00:00
+3fa60538-f4c5-81c6-91f6-c92acc0f4a6c,onboard,"members checked: 4
+learning queue rows created: 0
+icons backfilled: 100 (Problems 41, Weekly Summary 19, Learning Queue & Mastery 40); still without an icon: Problems 452, Learning Queue & Mastery 77",2026-10-15T22:42:00.000+00:00,OK,100,onboard 2026-10-15T22:42:44+00:00
+3fa60538-f4c5-81ef-8cd1-fcc27fb04218,onboard,"members checked: 4
+learning queue rows created: 0
+icons backfilled: 100 (Problems 33, Contests 2, Weekly Summary 33, Learning Queue & Mastery 32); still without an icon: Problems 493, Weekly Summary 19, Learning Queue & Mastery 117",2026-10-15T21:34:00.000+00:00,OK,100,onboard 2026-10-15T21:34:05+00:00
+3fa60538-f4c5-8181-aed0-fa2ca7cf692c,dashboards,"dashboard pages created: 2
+views created on new pages: 16
+missing views repaired: 0",2026-10-15T21:23:00.000+00:00,OK,18,dashboards 2026-10-15T21:23:57+00:00
+3fa60538-f4c5-81ab-b12f-dbc5fd29186a,onboard,"members checked: 4
+learning queue rows created: 0
+icons backfilled: 100 (Problems 20, Contests 19, Contest Entries 16, Weekly Summary 19, Achievements 7, Learning Queue & Mastery 19); still without an icon: Problems 526, Contests 2, Weekly Summary 52, Learning Queue & Mastery 149",2026-10-15T21:23:00.000+00:00,OK,100,onboard 2026-10-15T21:23:57+00:00
+3fa60538-f4c5-8133-8ddf-d50b73edf4dd,dashboards,"dashboard pages created: 2
+views created on new pages: 16
+missing views repaired: 0
+FAILED 🧪 Demo Sara / repair: NotionError: GET /blocks/3fa60538f4c581b59225f9c8dbc5c6c7/children -> HTTP 404: {""object"":""error"",""status"":404,""code"":""object_not_found"",""message"":""Could not find block with ID: 3fa60538-f4c5-81b5-9225-f9c8dbc5c6c
+FAILED Eyad Kamal / repair: NotionError: GET /blocks/3fa60538f4c581139051da7b1bf72b9f/children -> HTTP 404: {""object"":""error"",""status"":404,""code"":""object_not_found"",""message"":""Could not find block with ID: 3fa60538-f4c5-8113-9051-da7b1bf72b9",2026-10-15T21:18:00.000+00:00,Warning,18,dashboards 2026-10-15T21:18:13+00:00
+3fa60538-f4c5-819a-bdab-ea06c06661ff,daily,"overdue auto tasks skipped: 1
+topic practice tasks: off (AUTO_PRACTICE_TASKS is 0)
+LeetCode daily tasks created: 4
+upsolve reminders created: 1
+stale upsolve reminders skipped (contest ended before the window): 3",2026-10-15T21:18:00.000+00:00,OK,9,daily 2026-10-15T21:18:13+00:00
+3fa60538-f4c5-81f1-b645-d21cd6cfa80d,recompute,"members recomputed: 4/4
+writes: 7
+Who/Team filled or corrected: 0",2026-10-15T21:18:00.000+00:00,OK,7,recompute 2026-10-15T21:18:13+00:00
+3fa60538-f4c5-81be-bc73-e56c9c35acae,onboard,"members checked: 4
+learning queue rows created: 0
+icons backfilled: 100 (Problems 13, Tasks 4, Contests 13, Contest Entries 13, Weekly Summary 13, Weekly Reports 1, Rating History 11, Achievements 13, Goals 3, Learning Queue & Mastery 12, Members 4); still without an icon: Problems 546, Contests 21, Contest Entries 16, Weekly Summary 71, Achievements 7, Learning Queue & Mastery 168",2026-10-15T21:18:00.000+00:00,OK,100,onboard 2026-10-15T21:18:13+00:00
+3fa60538-f4c5-81e8-8e11-d21291729aa1,dashboards,"dashboard pages created: 4
+views created on new pages: 25
+missing views repaired: 0
+FAILED 🧪 Demo Omar / view Tasks (open): NotionError: POST /views -> HTTP 400: {""object"":""error"",""status"":400,""code"":""validation_error"",""message"":""select option \""🧪 Demo Omar\"" not found for property \""Who\"". Available options: \""Unassigned\"", \""Eyad Kam
+FAILED 🧪 Demo Omar / view Rating history: NotionError: POST /views -> HTTP 400: {""object"":""error"",""status"":400,""code"":""validation_error"",""message"":""body failed validation: body.configuration.x_axis.sort should be defined, instead was `undefined`."",""reques
+FAILED 🧪 Demo Sara / view Tasks (open): NotionError: POST /views -> HTTP 400: {""object"":""error"",""status"":400,""code"":""validation_error"",""message"":""select option \""🧪 Demo Sara\"" not found for property \""Who\"". Available options: \""Unassigned\"", \""Eyad Kam
+FAILED 🧪 Demo Sara / view Rating history: NotionError: POST /views -> HTTP 400: {""object"":""error"",""status"":400,""code"":""validation_error"",""message"":""body failed validation: body.configuration.x_axis.sort should be defined, instead was `undefined`."",""reques
+FAILED 🧪 Demo Laila / view Tasks (open): NotionError: POST /views -> HTTP 400: {""object"":""error"",""status"":400,""code"":""validation_error"",""message"":""select option \""🧪 Demo Laila\"" not found for property \""Who\"". Available options: \""Unassigned\"", \""Eyad Ka
+FAILED 🧪 Demo Laila / view Rating history: NotionError: POST /views -> HTTP 400: {""object"":""error"",""status"":400,""code"":""validation_error"",""message"":""body failed validation: body.configuration.x_axis.sort should be defined, instead was `undefined`."",""reques
+FAILED Eyad Kamal / view Goals: NotionError: POST /views -> HTTP 400: {""object"":""error"",""status"":400,""code"":""validation_error"",""message"":""select option \""Eyad Kamal\"" not found for property \""Who\"". Available options: \""Unassigned\"", \""🧪 Demo Om",2026-10-15T20:40:00.000+00:00,Warning,29,dashboards 2026-10-15T20:40:50+00:00
+3fa60538-f4c5-818d-a5f7-f4547a289aed,recompute,"members recomputed: 4/4
+writes: 488
+Who/Team filled or corrected: 0",2026-10-15T20:40:00.000+00:00,OK,488,recompute 2026-10-15T20:40:50+00:00
+3fa60538-f4c5-8130-a7a5-f31271f66742,weekly,"weeks checked: 12
+summary rows written: 84",2026-10-15T20:10:00.000+00:00,OK,84,weekly 2026-10-15T20:10:05+00:00
+3fa60538-f4c5-8116-af72-c7ff00d3c791,recompute,"members recomputed: 4/4
+writes: 476
+Who/Team filled or corrected: 61",2026-10-15T19:55:00.000+00:00,OK,476,recompute 2026-10-15T19:55:59+00:00
+3fa60538-f4c5-81a8-aa25-e71863afdad4,import,"members imported cleanly: 1/1
+placeholder contests renamed: 0
+contest Total Problems filled: 18
+problems: 303 new, 0 filled
+contest entries: 19 new (contests created: 19)
+rating rows: 0 new
+creates this run: 341, skipped by IMPORT_MAX_CREATES: 0",2026-10-15T19:55:00.000+00:00,OK,340,import 2026-10-15T19:55:59+00:00
+3fa60538-f4c5-8190-8e59-c9a91aa1d912,onboard,"members checked: 4
+learning queue rows created: 135
+personal dashboards created: 4",2026-10-15T19:52:00.000+00:00,OK,207,onboard 2026-10-15T19:52:00+00:00
+3fa60538-f4c5-8103-aa37-c7a659291f79,weekly,"week 2026-10-03 (Sat): 1 member summary
+report: created
+MVP: none",2026-10-15T16:20:00.000+00:00,OK,5,weekly 2026-10-15T16:20:15+00:00
+3fa60538-f4c5-81a9-b24a-db7a9600de8c,daily,"overdue practice tasks skipped: 0
+practice tasks created: 1 for 1 member(s)
+upsolve reminders created: 3",2026-10-15T16:20:00.000+00:00,OK,4,daily 2026-10-15T16:20:15+00:00
+3fa60538-f4c5-811f-9d39-c1e41006c0a1,recompute,"members recomputed: 1/1
+writes: 65",2026-10-15T16:20:00.000+00:00,OK,65,recompute 2026-10-15T16:20:15+00:00
+3fa60538-f4c5-81ae-b0a1-c45fd313027c,import,"members imported cleanly: 1/1
+problems: 23 new, 0 filled
+contest entries: 3 new (contests created: 3)
+rating rows: 11 new
+creates this run: 40, skipped by IMPORT_MAX_CREATES: 0",2026-10-15T16:20:00.000+00:00,OK,37,import 2026-10-15T16:20:15+00:00
+3fa60538-f4c5-81a2-8ee4-ca84e25a6faa,contests,"contests: 12 created, 0 updated, 0 phase changes
+contest tasks created: 0 (contests ticked: 0)
+contest tasks marked Missed: 0",2026-10-15T16:20:00.000+00:00,OK,12,contests 2026-10-15T16:20:15+00:00
+3fa60538-f4c5-818b-adb2-fd44f62f6cdc,onboard,"members checked: 1
+learning queue rows created: 45",2026-10-15T16:18:00.000+00:00,OK,46,onboard 2026-10-15T16:18:40+00:00
