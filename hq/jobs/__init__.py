@@ -9,6 +9,8 @@ Jobs:
   daily     - daily practice tasks, skipped-task cleanup, upsolve reminders
   weekly    - weekly summaries, MVP, weekly report page
   cleanup   - after a member row is deleted: trash its leftover rows and dashboard, remove the name from selects
+  archive   - MANUAL only (never scheduled): CSV backup of old daily-cadence rows, then trash them; sets SEASON_START
+              and Streak Start. See hq.jobs.archive.
 
 ``execute`` runs one job, turns exceptions into an "Error" result, and writes one
 Sync Log row. A failing job never stops the others.
@@ -60,6 +62,7 @@ class Context:
     mail: Callable[[str, str, str], bool] | None = None
     force: bool = False
     member_filter: str | None = None
+    archive: Any = None  # hq.jobs.archive.ArchiveOptions (CLI options of the archive job only)
     _problemset: list[dict[str, Any]] | None = None
 
     @property

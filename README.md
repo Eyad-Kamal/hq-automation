@@ -168,6 +168,7 @@ Do not delete rows. The important ones:
 | `DASHBOARDS_AUTO` | 1 | 1 = create a personal dashboard page for each active member with an empty Dashboard URL. 0 = off |
 | `MEMBER_CLEANUP` | 1 | 1 = after a Members row is deleted, trash that member's leftover rows and dashboard, and remove the name from the Who and Team lists. Acts only after two runs at least 15 minutes apart. 0 = off |
 | `CLEANUP_PER_RUN` | 300 | Most pages (rows and dashboards) the cleanup job trashes per run. Trashed pages stay in Notion's Trash for 30 days |
+| `ARCHIVE_PER_RUN` | 500 | Most pages the manual archive job trashes per run. The run result says `capped: yes` when more were due; run again to finish. See [Monthly archive](#monthly-archive-manual-never-scheduled) |
 | `FREEZE_EVERY` / `FREEZE_MAX` | 7 / 2 | A freeze is earned per 7 active days, up to 2 |
 | `TIER_*`, `BAND_*_FACTOR`, `MODE_*`, `GATE_L1..L4` | see the blueprint | Mastery, scoring and level gates |
 | `ADMIN_USER_ID` | empty | Notion user id mentioned on each weekly report. Leave empty to skip the mention. Find your id with the Notion API (`GET /v1/users`, using the integration token). This path is not verified in this repository. |
@@ -201,9 +202,25 @@ Every run (every 10 minutes) does, in order:
 7. **weekly**: only after Saturday 00:10 (Cairo time), once per week.
 8. **cleanup**: last. After a Members row is deleted, trashes that member's leftover rows and dashboard (never rows still linked to a live member), and removes the name from the Who and Team lists. A name is acted on only after two runs at least 15 minutes apart. Switch `MEMBER_CLEANUP`. Details in the Sync Log.
 
+The **archive** job is not in this list. It runs only when you start it (see below).
+
 Every job can run any number of times. Each record has a stable key, so reruns update or skip
 instead of duplicating. Your own edits are kept: the import fills only empty fields and never
 overwrites Notes, Key Idea, Time (min), or a Mode you changed.
+
+## Monthly archive (manual, never scheduled)
+
+Job `archive` frees Notion space by moving old daily rows to Notion's Trash after saving them to CSV. It is never run by the schedule or by `auto`. Start it only by hand: **Actions → HQ → Run workflow**, **Job** = `archive`.
+
+- **Dry run is the default.** The run reads Notion and writes nothing. A real run needs **dry_run** unticked **and** **confirm** typed as exactly `ARCHIVE`. Any other input is a dry run.
+- **What is archived** for the month before the current one (or `--month YYYY-MM` locally): Daily Log rows dated before the 1st of the current Cairo month; Tasks due (or created, when there is no due date) before that day with Status Done, Attended, Skipped or Missed (open tasks are never archived); Weekly Summary rows whose Week Start is before that day; Sync Log rows started more than 7 days ago.
+- **CSV backup:** `archive/<month>/daily_log.csv`, `tasks.csv`, `weekly_summary.csv`, `sync_log.csv`, all columns (notes, links, key idea included). The first column is `Page ID`. The real run commits and pushes these files **before** trashing anything. If the export, the commit or the push fails, nothing is trashed.
+- **Kept forever, never touched:** Problems, Learning Queue & Mastery, Goals, Achievements, Rating History, Contest Entries, Members totals, Teams, Topics, Levels, Contests, Resources and Code Templates. Your progress stays in Notion.
+- **Streaks restart each month.** The run sets every active member's **Streak Start** to the 1st of the current month. Days before it do not count for Current Streak, Best Streak or freezes. The Daily Log Active flags and Last Active keep the real history. **Create the Members property `Streak Start` (Date) in Notion by hand** before the first run. Without it the Streak Start step fails and the run reports it.
+- **Seasons:** after a clean run `SEASON_START` (Config) is set to the 1st of the current Cairo month, so season views start fresh.
+- **Big months:** at most `ARCHIVE_PER_RUN` pages are trashed per run. The result says `capped: yes` when rows are left; run the job again to finish. Rerunning is safe: rows already in the CSV are updated, not duplicated.
+- **Trash is recoverable** for 30 days in Notion's Trash.
+- Locally: `python -m hq.main archive --dry-run`. A real local run needs `--confirm ARCHIVE`; `--phase export` writes the CSV only, `--phase trash` trashes only rows whose Page ID is in the CSV.
 
 ## Seasons: start from 0 without deleting anything
 
@@ -307,7 +324,7 @@ python -m hq.main onboard                 # real run
 ```
 
 Useful options: `--force` (ignore the due checks), `--member "Name"` (limit to one trainee).
-Jobs: `auto`, `onboard`, `contests`, `alerts`, `imports`, `recompute`, `daily`, `weekly`.
+Jobs: `auto`, `onboard`, `contests`, `alerts`, `imports`, `recompute`, `daily`, `dashboards`, `weekly`, `backfill-weekly`, `cleanup`, `archive` (manual; `--dry-run` and `--confirm ARCHIVE` apply).
 Do not put the token inside any file in the repository.
 
 `HQ_IDS_JSON` (optional) must be the flat `{"Database title": "data source id"}` object, the same

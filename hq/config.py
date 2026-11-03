@@ -84,6 +84,7 @@ DEFAULTS: dict[str, Any] = {
     "TOPIC_ROUTE_PER_RUN": 300,
     "MEMBER_CLEANUP": 1,
     "CLEANUP_PER_RUN": 300,
+    "ARCHIVE_PER_RUN": 500,
 }
 
 _ISO_DAY = re.compile(r"\d{4}-\d{2}-\d{2}")
@@ -163,6 +164,24 @@ def state_datetime(repo: Repo, key: str) -> datetime | None:
 def state_date(repo: Repo, key: str) -> date | None:
     raw = get_state(repo, key)
     return date.fromisoformat(raw[:10]) if raw else None
+
+
+def set_date(repo: Repo, key: str, day: date, description: str = "") -> None:
+    """Create or update the Config row ``key`` with a date (its Date property, which SEASON_START
+    reads first) and the same date as Value text (dry-run aware)."""
+    props_value = {S.P_Config.VALUE: nt.p_text(day.isoformat()), S.P_Config.DATE: nt.p_date(day, with_time=False)}
+    row = repo.find(S.DB_CONFIG, S.P_Config.TITLE, key)
+    if row is None:
+        repo.create(
+            S.DB_CONFIG,
+            {
+                S.P_Config.TITLE: nt.p_title(key),
+                **props_value,
+                S.P_Config.DESCRIPTION: nt.p_text(description),
+            },
+        )
+        return
+    repo.sync(S.DB_CONFIG, row, props_value)
 
 
 def set_state(repo: Repo, key: str, value: str) -> None:

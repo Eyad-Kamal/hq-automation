@@ -500,7 +500,10 @@ def _recompute_member(
     active = {d for d, s in stats.items() if s.problems > 0 or s.contests > 0}
     freeze_every = int(num(cfg, K.FREEZE_EVERY))
     freeze_max = int(num(cfg, K.FREEZE_MAX))
-    current_state = streak.compute(active, today, freeze_every, freeze_max)
+    # Streak Start: days before it do not count for Current/Best Streak or freezes. Daily Log
+    # "Active" flags and Last Active still use every active day.
+    streak_days = streak.within_streak_start(active, cairo_day_of(get_date(member.page, S.P_Members.STREAK_START)))
+    current_state = streak.compute(streak_days, today, freeze_every, freeze_max)
 
     # Daily Log: the window plus today. Minutes and Reflection are never touched.
     team = repo.team_name(member.team_ids[0]) if member.team_ids else None
@@ -509,7 +512,7 @@ def _recompute_member(
     for offset in range(-window_days, 1):
         day = today + timedelta(days=offset)
         stat = stats.get(day, DayStat())
-        day_streak = streak.compute(active, day, freeze_every, freeze_max).current
+        day_streak = streak.compute(streak_days, day, freeze_every, freeze_max).current
         props = daily_log_props(
             member,
             team,

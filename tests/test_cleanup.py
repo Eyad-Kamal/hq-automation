@@ -319,7 +319,7 @@ def test_cleanup_is_a_cli_job_and_runs_last_in_auto() -> None:
 
 def test_workflow_offers_cleanup_as_a_job() -> None:
     text = (Path(__file__).resolve().parents[1] / ".github" / "workflows" / "hq.yml").read_text(encoding="utf-8")
-    assert "backfill-weekly, cleanup]" in text
+    assert "backfill-weekly, cleanup, archive]" in text
 
 
 def test_trash_and_option_update_requests() -> None:

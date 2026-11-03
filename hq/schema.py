@@ -139,6 +139,7 @@ class P_Members:
     SEASON_START = "Season Start"  # coach reset: this member's season starts here (date)
     SEASON_POINTS = "Season Points"  # points of deduped solves in season
     SEASON_SOLVED = "Season Solved"  # deduped solves in season
+    STREAK_START = "Streak Start"  # date: streaks ignore days before it (empty = no change); the archive job sets it
     # relations
     TEAM = "Team"
     LEVEL = "Level"
@@ -623,6 +624,7 @@ class ConfigKey:
     TOPIC_ROUTE_PER_RUN = "TOPIC_ROUTE_PER_RUN"  # most Problems rows whose Topics recompute rewrites per run
     MEMBER_CLEANUP = "MEMBER_CLEANUP"  # 1 = after a Members row is deleted, trash its leftover rows and dashboard (cleanup job); 0 = off
     CLEANUP_PER_RUN = "CLEANUP_PER_RUN"  # most pages (rows and dashboards) the cleanup job trashes per run
+    ARCHIVE_PER_RUN = "ARCHIVE_PER_RUN"  # most pages the archive job trashes per run (manual job, see hq.jobs.archive)
 
 
 # Source Key prefix of the automatic "LeetCode daily" task: "lcdaily:<date>:<member id>".

@@ -2,7 +2,9 @@
 
 Jobs: auto (default in CI), onboard, contests, alerts, imports, recompute, daily, dashboards, weekly,
 backfill-weekly (Weekly Summary rows for the last WEEKLY_BACKFILL_WEEKS weeks; no reports or MVP),
-cleanup (trash a deleted member's leftover rows and dashboard; MEMBER_CLEANUP).
+cleanup (trash a deleted member's leftover rows and dashboard; MEMBER_CLEANUP),
+archive (MANUAL ONLY, never in auto: CSV backup of old daily rows, then trash them; needs --confirm ARCHIVE
+unless --dry-run; options --month YYYY-MM, --out DIR, --phase all|export|trash).
 
 ``auto`` runs, in this order:
   onboard -> contests -> alerts -> [imports + recompute, when the last import is
@@ -27,13 +29,14 @@ import argparse
 import logging
 import os
 import sys
+from pathlib import Path
 from collections.abc import Callable, Mapping, Sequence
 
 import requests
 
 from hq import config, notify
 from hq.jobs import ERROR, Context, JobResult, execute
-from hq.jobs import alerts, cleanup, contests, daily, dashboards, imports, onboard, recompute, weekly
+from hq.jobs import alerts, archive, cleanup, contests, daily, dashboards, imports, onboard, recompute, weekly
 from hq.notion import Notion, load_data_source_ids
 from hq.repo import Repo
 from hq.sources import atcoder, codeforces, leetcode
@@ -50,6 +53,7 @@ JOBS: dict[str, Callable[[Context], JobResult]] = {
     "backfill-weekly": weekly.backfill_run,
     "dashboards": dashboards.run,
     "cleanup": cleanup.run,
+    "archive": archive.run,  # manual only: not in run_auto
 }
 ALIASES: dict[str, str] = {"import": "imports"}
 CHOICES = ("auto", *JOBS, *ALIASES)
@@ -132,6 +136,10 @@ def parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     parser.add_argument("--force", action="store_true", help="ignore the due checks (imports, daily, weekly)")
     parser.add_argument("--dry-run", action="store_true", help="read Notion, write nothing; print the intended writes")
     parser.add_argument("--member", metavar="NAME", help="limit per-member work to one active member")
+    parser.add_argument("--month", metavar="YYYY-MM", help="archive: the month to archive (default: the month before the current Cairo month)")
+    parser.add_argument("--out", metavar="DIR", help="archive: output directory (default: archive/<month> in the repo)")
+    parser.add_argument("--phase", choices=archive.PHASES, default="all", help="archive: all (export then trash), export (CSV only) or trash (needs the CSV files)")
+    parser.add_argument("--confirm", metavar="WORD", help="archive: must be ARCHIVE for any run that is not a dry run")
     parser.add_argument("-v", "--verbose", action="store_true", help="debug logging")
     return parser.parse_args(argv)
 
@@ -154,6 +162,12 @@ def build_context(args: argparse.Namespace, env: Mapping[str, str]) -> Context:
         mail=mail,
         force=bool(args.force),
         member_filter=args.member,
+        archive=archive.ArchiveOptions(
+            month=args.month,
+            out=Path(args.out) if args.out else None,
+            phase=args.phase,
+            confirm=args.confirm,
+        ),
     )
 
 

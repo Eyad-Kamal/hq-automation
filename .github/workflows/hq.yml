@@ -7,6 +7,11 @@
 # Manual runs: Actions -> HQ -> Run workflow. Pick a job (default "auto") and tick
 # "force" to ignore the due checks (25-minute import guard, once-a-day, once-a-week).
 #
+# Job "archive" is MANUAL ONLY (it is not in the schedule and not in "auto"). It is a dry run
+# unless BOTH "dry_run" is unticked AND "confirm" is exactly ARCHIVE. A real run writes the CSV
+# backup under archive/<month>/, commits and pushes it, and only then trashes the old rows.
+# If the export, the commit or the push fails, nothing is trashed.
+#
 # Secrets (Settings -> Secrets and variables -> Actions):
 #   NOTION_TOKEN         required
 #   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM   optional (email alerts)
@@ -21,18 +26,27 @@ on:
         description: "Job to run"
         type: choice
         default: auto
-        options: [auto, onboard, contests, alerts, imports, recompute, daily, dashboards, weekly, backfill-weekly, cleanup]
+        options: [auto, onboard, contests, alerts, imports, recompute, daily, dashboards, weekly, backfill-weekly, cleanup, archive]
       force:
         description: "Ignore the due checks (import guard, once-a-day, once-a-week)"
         type: boolean
         default: false
+      confirm:
+        description: "Archive only: type ARCHIVE to allow a real run (any other value is a dry run)"
+        type: string
+        default: ""
+        required: true
+      dry_run:
+        description: "Archive only: dry run, reads Notion and writes nothing (untick, and type ARCHIVE in confirm, to archive)"
+        type: boolean
+        default: true
 
 concurrency:
   group: hq
   cancel-in-progress: false
 
 permissions:
-  contents: read
+  contents: write  # the archive job commits its CSV backup to main
 
 jobs:
   run:
@@ -50,6 +64,7 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Run HQ job
+        if: inputs.job != 'archive'
         env:
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
           SMTP_HOST: ${{ secrets.SMTP_HOST }}
@@ -58,3 +73,31 @@ jobs:
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
           SMTP_FROM: ${{ secrets.SMTP_FROM }}
         run: python -m hq.main "${{ inputs.job || 'auto' }}" ${{ inputs.force && '--force' || '' }}
+
+      - name: Archive (manual; dry run unless dry_run is off and confirm is ARCHIVE)
+        if: inputs.job == 'archive'
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          ARCHIVE_CONFIRM: ${{ inputs.confirm }}
+          ARCHIVE_DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          if [ "$ARCHIVE_DRY_RUN" != "false" ] || [ "$ARCHIVE_CONFIRM" != "ARCHIVE" ]; then
+            echo "Dry run: nothing is written, committed or trashed."
+            python -m hq.main archive --dry-run --confirm "$ARCHIVE_CONFIRM"
+            exit 0
+          fi
+          # 1. CSV backup first. If this fails, the steps below do not run.
+          python -m hq.main archive --phase export --confirm ARCHIVE
+          # 2. Commit and push the backup. If this fails, the trash step does not run.
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- archive
+          if git diff --cached --quiet; then
+            echo "No CSV changes to commit."
+          else
+            git commit -m "Monthly archive: CSV backup"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
+          # 3. Trash only the rows whose Page ID is in the committed CSV files.
+          python -m hq.main archive --phase trash --confirm ARCHIVE

@@ -36,6 +36,14 @@ class StreakResult:
     frozen_days: set[date] = field(default_factory=set)
 
 
+def within_streak_start(active_days: set[date], start: date | None) -> set[date]:
+    """The active days a streak may count: those on or after ``start`` (the member's Streak Start).
+    With no start (None) every day counts, so the result is unchanged."""
+    if start is None:
+        return set(active_days)
+    return {d for d in active_days if d >= start}
+
+
 def compute(
     active_days: set[date],
     today: date,
