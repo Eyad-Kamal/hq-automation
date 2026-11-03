@@ -12,6 +12,11 @@
 # backup under archive/<month>/, commits and pushes it, and only then trashes the old rows.
 # If the export, the commit or the push fails, nothing is trashed.
 #
+# FULL RESET (manual only, never scheduled): tick "full_reset" and type RESET in "confirm" (plus untick
+# "dry_run") to save every table to CSV under archive/<reset-date>/, check the counts, then trash the
+# progress rows in capped batches. Everyone restarts from 0 from the reset date. Run it again while the
+# result says "capped: yes".
+#
 # Secrets (Settings -> Secrets and variables -> Actions):
 #   NOTION_TOKEN         required
 #   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM   optional (email alerts)
@@ -32,10 +37,14 @@ on:
         type: boolean
         default: false
       confirm:
-        description: "Archive only: type ARCHIVE to allow a real run (any other value is a dry run)"
+        description: "Archive only: type ARCHIVE (monthly) or RESET (full_reset) to allow a real run (any other value is a dry run)"
         type: string
         default: ""
         required: true
+      full_reset:
+        description: "Archive only: FULL RESET. Every table to CSV, then trash the progress data; everyone restarts from 0 from today. Needs confirm RESET and dry_run off."
+        type: boolean
+        default: false
       dry_run:
         description: "Archive only: dry run, reads Notion and writes nothing (untick, and type ARCHIVE in confirm, to archive)"
         type: boolean
@@ -74,14 +83,38 @@ jobs:
           SMTP_FROM: ${{ secrets.SMTP_FROM }}
         run: python -m hq.main "${{ inputs.job || 'auto' }}" ${{ inputs.force && '--force' || '' }}
 
-      - name: Archive (manual; dry run unless dry_run is off and confirm is ARCHIVE)
+      - name: Archive (manual; dry run unless dry_run is off and confirm is ARCHIVE, or RESET with full_reset)
         if: inputs.job == 'archive'
         env:
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
           ARCHIVE_CONFIRM: ${{ inputs.confirm }}
           ARCHIVE_DRY_RUN: ${{ inputs.dry_run }}
+          ARCHIVE_FULL: ${{ inputs.full_reset }}
         run: |
           set -euo pipefail
+          if [ "$ARCHIVE_FULL" = "true" ]; then
+            # FULL RESET: a real run needs dry_run off AND confirm exactly RESET. Otherwise nothing is written.
+            if [ "$ARCHIVE_DRY_RUN" != "false" ] || [ "$ARCHIVE_CONFIRM" != "RESET" ]; then
+              echo "Full reset dry run: nothing is written, committed or trashed."
+              python -m hq.main archive --full --dry-run --confirm "$ARCHIVE_CONFIRM"
+              exit 0
+            fi
+            # 1. CSV of every table first. If this fails, the steps below do not run.
+            python -m hq.main archive --full --phase export --confirm RESET
+            # 2. Commit and push the backup. If this fails, the trash step does not run.
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -- archive
+            if git diff --cached --quiet; then
+              echo "No CSV changes to commit."
+            else
+              git commit -m "Full reset: CSV backup of every table"
+              git push origin "HEAD:${GITHUB_REF_NAME}"
+            fi
+            # 3. Verify the counts and trash in capped batches (ARCHIVE_PER_RUN). Run the job again while the result says capped: yes.
+            python -m hq.main archive --full --phase trash --confirm RESET
+            exit 0
+          fi
           if [ "$ARCHIVE_DRY_RUN" != "false" ] || [ "$ARCHIVE_CONFIRM" != "ARCHIVE" ]; then
             echo "Dry run: nothing is written, committed or trashed."
             python -m hq.main archive --dry-run --confirm "$ARCHIVE_CONFIRM"

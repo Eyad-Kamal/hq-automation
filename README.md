@@ -222,6 +222,18 @@ Job `archive` frees Notion space by moving old daily rows to Notion's Trash afte
 - **Trash is recoverable** for 30 days in Notion's Trash.
 - Locally: `python -m hq.main archive --dry-run`. A real local run needs `--confirm ARCHIVE`; `--phase export` writes the CSV only, `--phase trash` trashes only rows whose Page ID is in the CSV.
 
+## Full reset (manual, never scheduled)
+
+Everyone restarts from 0 from the reset date (today, Cairo). Start it only by hand: **Actions → HQ → Run workflow**, **Job** = `archive`, **full_reset** ticked.
+
+- **Dry run is the default.** A real full reset needs **full_reset** ticked, **dry_run** unticked **and** **confirm** typed as exactly `RESET`. Any other input is a dry run and writes nothing. Locally: `python -m hq.main archive --full --dry-run`; a real local run needs `--full --confirm RESET`.
+- **Order:** (1) every table is exported to `archive/<reset-date>/` (CSV, all properties, `Page ID` first); the workflow commits and pushes it; (2) the CSV is checked against Notion: every live row must be in its file, or nothing is trashed; (3) progress rows are trashed in capped batches (`ARCHIVE_PER_RUN`), only rows whose Page ID is in the CSV. Run the job again while the result says `capped: yes`.
+- **Exported:** Problems, Daily Log, Weekly Summary, Tasks (all statuses), Sync Log, Contest Entries, Rating History, Learning Queue & Mastery, Goals, Achievements, Weekly Reports, Members, Teams.
+- **Trashed:** Problems, Daily Log, Weekly Summary, Sync Log, Contest Entries, Rating History, Achievements, Weekly Reports, and Tasks with Status Done, Skipped, Missed, Attended, Upsolved or Virtual Done. **Open tasks** (To Do, Planned, In Progress, no status) are kept.
+- **Never trashed:** Learning Queue & Mastery rows (a Mastered row goes back to Practicing, once the trash is finished), Goals, Members, Teams, Config, Topics, Levels, Contests, Resources, Code Templates.
+- **Members (active):** Last Sync = the reset date, so imports read from two days before it and do not re-create old solves. Streak Start = the reset date. Member Season Start is not changed. Config `SEASON_START` = the reset date.
+- **Not verified live:** the Members property names used here, the Tasks status names Upsolved and Virtual Done, and the Notion trash call. Check the first real run's result before running it again.
+
 ## Seasons: start from 0 without deleting anything
 
 A season lets everyone start from 0 in the season views, while the all-time views keep everything.
@@ -325,7 +337,7 @@ python -m hq.main onboard                 # real run
 ```
 
 Useful options: `--force` (ignore the due checks), `--member "Name"` (limit to one trainee).
-Jobs: `auto`, `onboard`, `contests`, `alerts`, `imports`, `recompute`, `daily`, `dashboards`, `weekly`, `backfill-weekly`, `cleanup`, `archive` (manual; `--dry-run` and `--confirm ARCHIVE` apply).
+Jobs: `auto`, `onboard`, `contests`, `alerts`, `imports`, `recompute`, `daily`, `dashboards`, `weekly`, `backfill-weekly`, `cleanup`, `archive` (manual; `--dry-run` and `--confirm ARCHIVE` apply; `--full` is the full reset and needs `--confirm RESET`).
 Do not put the token inside any file in the repository.
 
 `HQ_IDS_JSON` (optional) must be the flat `{"Database title": "data source id"}` object, the same

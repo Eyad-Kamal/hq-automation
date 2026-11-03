@@ -36,6 +36,28 @@ Safety:
 Not verified against the live Notion API: the trash call (PATCH /pages with in_trash), the Members
 "Streak Start" date property (it must be created in Notion by hand), and the Tasks status names above
 (taken from the other jobs: "Done" is the complete status, "Attended" is set on contest tasks).
+
+FULL RESET (``--full``, workflow input full_reset): everyone restarts from 0 from the reset date (the current
+Cairo day). Same phases, same CSV-first order, same cap ARCHIVE_PER_RUN, same idempotency. A real run needs
+``confirm == "RESET"`` (any other confirm value is refused before any write). Output: ``archive/<reset-date>/``.
+* Export (every table, all properties, all rows): Problems, Daily Log, Weekly Summary, Tasks (all statuses),
+  Sync Log, Contest Entries, Rating History, Learning Queue & Mastery, Goals, Achievements, Weekly Reports,
+  Members, Teams. Config, Topics, Levels, Contests, Resources and Code Templates are not exported.
+* Verify (before any trash, and again on the trash phase, from the CSV on disk): every live Notion row is in its
+  CSV. A file row that is no longer in Notion is allowed: it was backed up before it left Notion (this is what
+  a rerun after a capped run sees). A missing file or a missing row stops the run with nothing trashed.
+* Trash (capped, only rows whose Page ID is in the CSV): Problems, Daily Log, Weekly Summary, Sync Log, Contest
+  Entries, Rating History, Achievements, Weekly Reports, and Tasks whose Status is Done, Skipped, Missed,
+  Attended, Upsolved or Virtual Done. Open Tasks (To Do, Planned, In Progress, no status) are kept.
+  Never trashed: Learning Queue & Mastery, Goals, Members, Teams, Config, Topics, Levels, Contests, Resources.
+* Learning Queue & Mastery: a row with Queue Status Mastered goes back to Practicing (only after every trash
+  is done, so a capped run does not reset it early). Its other stored fields are left as they are.
+* Members (active only, after the trash, when nothing failed): Last Sync = the reset date (so imports read
+  from two days before it and do not re-create old solves), Streak Start = the reset date. Member Season
+  Start is not changed (the monthly archive does not change it either). Config SEASON_START = the reset date.
+* Not verified live: the Members property names used here, the Tasks status names "Upsolved" and
+  "Virtual Done", and whether Last Sync and Streak Start accept writes through the API (the monthly archive
+  already writes Streak Start, the import job already writes Last Sync).
 """
 
 from __future__ import annotations
@@ -68,6 +90,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 PAGE_ID_COLUMN = "Page ID"
 SYNC_LOG_DAYS = 7
 CLOSED_TASK_STATUSES = frozenset({"Done", "Attended", "Skipped", "Missed"})
+FULL_RESET_WORD = "RESET"
+FULL_TASK_TRASH_STATUSES = frozenset({"Done", "Skipped", "Missed", "Attended", "Upsolved", "Virtual Done"})
 ERROR_CHARS = 200
 _MONTH = re.compile(r"(\d{4})-(\d{2})")
 
@@ -80,6 +104,7 @@ class ArchiveOptions:
     out: Path | None = None
     phase: str = "all"
     confirm: str | None = None
+    full: bool = False  # FULL RESET (see the module docstring); needs confirm == "RESET" for a real run
 
 
 @dataclass(frozen=True)
@@ -321,11 +346,212 @@ def _plan(ctx: Context, opts: ArchiveOptions) -> tuple[str, date, Path]:
     return label, cutoff, out
 
 
+# ---------------------------------------------------------------------------
+# FULL RESET (--full): see the module docstring
+# ---------------------------------------------------------------------------
+def _every(row: dict[str, Any]) -> bool:
+    return True
+
+
+def _full_task_closed(row: dict[str, Any]) -> bool:
+    return get_status(row, S.P_Tasks.STATUS) in FULL_TASK_TRASH_STATUSES
+
+
+@dataclass(frozen=True)
+class FullTable:
+    db: str
+    file: str
+    trash: Callable[[dict[str, Any]], bool] | None  # None: the reset never trashes this table
+
+
+FULL_TABLES: tuple[FullTable, ...] = (
+    FullTable(S.DB_PROBLEMS, "problems.csv", _every),
+    FullTable(S.DB_DAILY_LOG, "daily_log.csv", _every),
+    FullTable(S.DB_WEEKLY_SUMMARY, "weekly_summary.csv", _every),
+    FullTable(S.DB_TASKS, "tasks.csv", _full_task_closed),
+    FullTable(S.DB_SYNC_LOG, "sync_log.csv", _every),
+    FullTable(S.DB_CONTEST_ENTRIES, "contest_entries.csv", _every),
+    FullTable(S.DB_RATING_HISTORY, "rating_history.csv", _every),
+    FullTable(S.DB_LEARNING_QUEUE, "learning_queue.csv", None),
+    FullTable(S.DB_GOALS, "goals.csv", None),
+    FullTable(S.DB_ACHIEVEMENTS, "achievements.csv", _every),
+    FullTable(S.DB_WEEKLY_REPORTS, "weekly_reports.csv", _every),
+    FullTable(S.DB_MEMBERS, "members.csv", None),
+    FullTable(S.DB_TEAMS, "teams.csv", None),
+)
+
+
+def _verify_backup(out_dir: Path, scope: list[tuple[FullTable, list[dict[str, Any]], dict[str, Any]]]) -> tuple[dict[str, tuple[int, int]], list[str], dict[str, set[str]]]:
+    """Check the CSV files on disk against the live rows. Returns ({file: (Notion rows, CSV rows)}, problems, {file: backed-up Page IDs}).
+    A live row missing from its file is a problem. A file row that is no longer in Notion is not: it was backed up
+    before it left Notion (a rerun after a capped trash sees these)."""
+    counts: dict[str, tuple[int, int]] = {}
+    problems: list[str] = []
+    backed: dict[str, set[str]] = {}
+    for table, pages, _schema in scope:
+        path = out_dir / table.file
+        if not path.is_file():
+            problems.append(f"{table.file}: the CSV does not exist")
+            counts[table.file] = (len(pages), 0)
+            backed[table.file] = set()
+            continue
+        rows, _header = _read_csv(path)
+        ids = {key for key in rows if not key.startswith("#row")}
+        unkeyed = len(rows) - len(ids)
+        live_ids = {str(page["id"]) for page in pages}
+        missing = live_ids - ids
+        counts[table.file] = (len(pages), len(rows))
+        backed[table.file] = ids
+        if unkeyed:
+            problems.append(f"{table.file}: {unkeyed} row(s) without a Page ID")
+        if missing:
+            problems.append(f"{table.file}: {len(missing)} live Notion row(s) not in the CSV (Notion {len(pages)}, CSV {len(rows)})")
+    return counts, problems, backed
+
+
+def _run_full(ctx: Context, opts: ArchiveOptions) -> JobResult:
+    if not ctx.dry_run and opts.confirm != FULL_RESET_WORD:
+        return JobResult(
+            job=JOB,
+            result=ERROR,
+            items=0,
+            details="full reset refused: a real full reset needs full_reset = true, confirm = RESET and dry_run = false. Nothing was written or trashed.",
+            skipped=True,
+        )
+    reset_day = ctx.today
+    out_dir = Path(opts.out) if opts.out is not None else REPO_ROOT / "archive" / reset_day.isoformat()
+    repo = ctx.repo
+    try:
+        scope = []
+        for table in FULL_TABLES:
+            schema = repo.data_source_properties(table.db)
+            pages = list(repo.rows(table.db))
+            scope.append((table, pages, schema))
+    except Exception as exc:  # noqa: BLE001 - nothing has been written yet
+        log.warning("full reset stopped while reading Notion: %s", _short(exc))
+        return JobResult(job=JOB, result=ERROR, items=0, details=f"full reset stopped, nothing written or trashed: {_short(exc)}")
+
+    exported: dict[str, tuple[int, int]] = {}
+    if opts.phase in ("all", "export"):
+        try:
+            for table, pages, schema in scope:
+                if not ctx.dry_run:
+                    out_dir.mkdir(parents=True, exist_ok=True)
+                exported[table.file] = _export_table(repo, table, pages, schema, out_dir, ctx.dry_run)
+        except Exception as exc:  # noqa: BLE001 - an export failure means nothing is trashed
+            log.warning("full reset export failed, nothing trashed: %s", _short(exc))
+            return JobResult(job=JOB, result=ERROR, items=0, details=f"full export failed, nothing trashed: {_short(exc)}")
+
+    counts: dict[str, tuple[int, int]] = {}
+    backed: dict[str, set[str]] = {}
+    if not ctx.dry_run:
+        counts, problems, backed = _verify_backup(out_dir, scope)
+        if problems:
+            lines = [f"full reset stopped: the CSV backup does not match Notion; nothing trashed or changed. Folder: {out_dir}"]
+            lines += [f"FAILED {line}" for line in problems]
+            return JobResult(job=JOB, result=ERROR, items=sum(new for _rows, new in exported.values()), details="\n".join(lines))
+
+    trashed: dict[str, int] = {}
+    kept_open_tasks = 0
+    not_backed_up = 0
+    cap = max(0, int(num(ctx.cfg, K.ARCHIVE_PER_RUN)))
+    capped = False
+    failures: list[str] = []
+    mastered_reset = 0
+    queue_skipped = False
+    set_dates = False
+    dated = 0
+    if opts.phase in ("all", "trash"):
+        candidates = []
+        for table, pages, _schema in scope:
+            if table.trash is None:
+                continue
+            eligible = [p for p in pages if table.trash(p)]
+            if table.db == S.DB_TASKS:
+                kept_open_tasks = len(pages) - len(eligible)
+            if ctx.dry_run:
+                allowed = eligible
+            else:
+                allowed = [p for p in eligible if str(p["id"]) in backed.get(table.file, set())]
+                not_backed_up += len(eligible) - len(allowed)
+            candidates += [(table, page) for page in allowed]
+        capped = len(candidates) > cap
+        for table, page in candidates[:cap]:
+            try:
+                repo.trash(table.db, page)
+                trashed[table.db] = trashed.get(table.db, 0) + 1
+            except Exception as exc:  # noqa: BLE001 - one row must not stop the others
+                failures.append(f"{table.db} row {page.get('id')}: trash failed ({_short(exc)})")
+        # Learning Queue: only after every progress row is gone, so a capped run does not reset it early.
+        queue_file = next(t.file for t in FULL_TABLES if t.db == S.DB_LEARNING_QUEUE)
+        queue_pages = next(pages for table, pages, _schema in scope if table.db == S.DB_LEARNING_QUEUE)
+        if capped or failures:
+            queue_skipped = True
+        else:
+            for page in queue_pages:
+                if get_status(page, S.P_LearningQueue.QUEUE_STATUS) != "Mastered":
+                    continue
+                if not ctx.dry_run and str(page["id"]) not in backed.get(queue_file, set()):
+                    continue
+                try:
+                    if repo.sync(S.DB_LEARNING_QUEUE, page, {S.P_LearningQueue.QUEUE_STATUS: nt.p_status("Practicing")}):
+                        mastered_reset += 1
+                except Exception as exc:  # noqa: BLE001
+                    failures.append(f"Learning Queue row {page.get('id')}: not reset ({_short(exc)})")
+        set_dates = not failures
+        if set_dates:
+            try:
+                config.set_date(repo, K.SEASON_START, reset_day, "Set by the full reset: the reset date; season views start here.")
+            except Exception as exc:  # noqa: BLE001
+                failures.append(f"SEASON_START not set ({_short(exc)})")
+            for member in repo.members():
+                if not member.active:
+                    continue
+                try:
+                    repo.sync(
+                        S.DB_MEMBERS,
+                        member.page,
+                        {
+                            S.P_Members.LAST_SYNC: nt.p_date(reset_day, with_time=False),
+                            S.P_Members.STREAK_START: nt.p_date(reset_day, with_time=False),
+                        },
+                    )
+                    dated += 1
+                except Exception as exc:  # noqa: BLE001
+                    failures.append(f"Last Sync / Streak Start for {member.name} not set ({_short(exc)})")
+
+    lines = [f"full reset: reset date {reset_day.isoformat()} (Cairo); folder {out_dir}"]
+    if opts.phase in ("all", "export"):
+        lines.append("export: " + ", ".join(f"{name} {rows} row(s), {new} new" for name, (rows, new) in exported.items()))
+    if ctx.dry_run:
+        lines.append("count check: skipped in a dry run (no CSV is written)")
+    else:
+        lines.append("count check (Notion/CSV): " + ", ".join(f"{name} {n}/{c}" for name, (n, c) in counts.items()) + " OK")
+    if opts.phase in ("all", "trash"):
+        lines.append(
+            "trashed: " + ", ".join(f"{t.db} {trashed.get(t.db, 0)}" for t in FULL_TABLES if t.trash is not None)
+            + f" (total {sum(trashed.values())})"
+        )
+        lines.append(f"tasks kept (open, no status): {kept_open_tasks}")
+        lines.append(f"not trashed because not in the CSV backup: {not_backed_up}")
+        lines.append(f"capped: {'yes' if capped else 'no'} (ARCHIVE_PER_RUN {cap})")
+        if queue_skipped:
+            lines.append("Learning Queue Mastered -> Practicing: skipped (the trash is not finished; run again)")
+        else:
+            lines.append(f"Learning Queue Mastered -> Practicing: {mastered_reset} row(s)")
+        lines.append(f"SEASON_START set: {'yes' if set_dates else 'no'}; Last Sync and Streak Start set for {dated} active member(s)")
+    lines += [f"FAILED {line}" for line in failures]
+    items = sum(new for _rows, new in exported.values()) + sum(trashed.values()) + mastered_reset
+    return JobResult(job=JOB, result=WARNING if failures else OK, items=items, details="\n".join(lines))
+
+
 def run(ctx: Context) -> JobResult:
     opts = ctx.archive if isinstance(ctx.archive, ArchiveOptions) else ArchiveOptions()
     # skipped=True: a refused run writes no Sync Log row either; the exit code is still 1 (result Error).
     if opts.phase not in PHASES:
         return JobResult(job=JOB, result=ERROR, items=0, details=f"archive refused: --phase must be one of {', '.join(PHASES)}", skipped=True)
+    if opts.full:
+        return _run_full(ctx, opts)
     if not ctx.dry_run and opts.confirm != CONFIRM_WORD:
         return JobResult(
             job=JOB,
