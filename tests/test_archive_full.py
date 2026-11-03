@@ -344,3 +344,64 @@ def test_workflow_has_full_reset_input_and_order() -> None:
     assert full_at < commit_at < trash_at
     assert 'ARCHIVE_CONFIRM" != "RESET"' in text, "a real full reset needs confirm RESET"
     assert "full_reset" not in text.split("cron:")[1].split("workflow_dispatch")[0]
+
+
+def _sync(w, title: str, started: datetime) -> str:
+    return w.notion.seed(S.DB_SYNC_LOG, {S.P_SyncLog.TITLE: nt.p_title(title), S.P_SyncLog.STARTED: nt.p_date(started)})
+
+
+def test_sync_row_of_this_run_after_the_export_is_not_missing(world, tmp_path) -> None:
+    """The export runs at NOW. Afterwards a Sync Log row with this run's timestamp is created (the run's own row).
+    The trash phase verifies and passes, and that row is never trashed."""
+    ids = _seed_club(world)
+    out = tmp_path / "reset"
+    assert _run(world, out, phase="export").result == OK
+    own = _sync(world, f"archive {NOW.isoformat()}", NOW)
+    result = _run(world, out, phase="trash", now=NOW + timedelta(hours=1))
+    assert result.result == OK, result.details
+    assert "FAILED" not in result.details
+    assert "Sync Log rows started by this reset run or after the export snapshot (not checked, never trashed): 1" in result.details
+    assert own not in world.notion.trashed
+    assert ids["sync"] in world.notion.trashed, "older Sync Log rows are still trashed"
+
+
+def test_other_missing_row_still_fails_with_nothing_trashed(world, tmp_path) -> None:
+    """Same as above, plus a row that existed before the export and is missing from its CSV: the run stops, nothing trashed."""
+    ids = _seed_club(world)
+    out = tmp_path / "reset"
+    assert _run(world, out, phase="export").result == OK
+    own = _sync(world, f"archive {NOW.isoformat()}", NOW)
+    missing = _sync(world, "import old", NOW - timedelta(days=2))
+    result = _run(world, out, phase="trash", now=NOW + timedelta(hours=1))
+    assert result.result == ERROR
+    assert "nothing trashed or changed" in result.details
+    assert "sync_log.csv: 1 live Notion row(s) not in the CSV" in result.details
+    assert world.notion.trashed == []
+    assert own not in world.notion.trashed and missing not in world.notion.trashed and ids["sync"] not in world.notion.trashed
+
+
+def test_run_own_sync_row_is_never_trashed(world, tmp_path) -> None:
+    """A Sync Log row started at the export snapshot time is in the CSV, but it is the export run's own row: the trash
+    phase must not trash it, while older Sync Log rows are trashed as before."""
+    ids = _seed_club(world)
+    own = _sync(world, f"archive {NOW.isoformat()}", NOW)
+    out = tmp_path / "reset"
+    assert _run(world, out, phase="export").result == OK
+    result = _run(world, out, phase="trash", now=NOW + timedelta(hours=1))
+    assert result.result == OK, result.details
+    assert own not in world.notion.trashed
+    assert ids["sync"] in world.notion.trashed
+    assert "trashed: " in result.details and "capped: no" in result.details
+
+
+def test_missing_stamp_keeps_the_check_strict_for_older_rows(world, tmp_path) -> None:
+    """Without the export stamp (an old folder), a row started before this run is still checked strictly."""
+    _seed_club(world)
+    out = tmp_path / "reset"
+    assert _run(world, out, phase="export").result == OK
+    (out / archive.EXPORT_STAMP).unlink()
+    _sync(world, f"archive {NOW.isoformat()}", NOW)
+    result = _run(world, out, phase="trash", now=NOW + timedelta(hours=1))
+    assert result.result == ERROR
+    assert "sync_log.csv: 1 live Notion row(s) not in the CSV" in result.details
+    assert world.notion.trashed == []

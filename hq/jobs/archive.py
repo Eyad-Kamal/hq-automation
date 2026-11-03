@@ -46,6 +46,9 @@ Cairo day). Same phases, same CSV-first order, same cap ARCHIVE_PER_RUN, same id
 * Verify (before any trash, and again on the trash phase, from the CSV on disk): every live Notion row is in its
   CSV. A file row that is no longer in Notion is allowed: it was backed up before it left Notion (this is what
   a rerun after a capped run sees). A missing file or a missing row stops the run with nothing trashed.
+  Sync Log rows started at or after the export snapshot (the export phase writes its start time to
+  ``export_started.txt`` in the folder; this run's start when it is the export run) are not checked and never
+  trashed: the snapshot cannot contain them (the export run's own row, and the row of a later run).
 * Trash (capped, only rows whose Page ID is in the CSV): Problems, Daily Log, Weekly Summary, Sync Log, Contest
   Entries, Rating History, Achievements, Weekly Reports, and Tasks whose Status is Done, Skipped, Missed,
   Attended, Upsolved or Virtual Done. Open Tasks (To Do, Planned, In Progress, no status) are kept.
@@ -381,14 +384,49 @@ FULL_TABLES: tuple[FullTable, ...] = (
 )
 
 
-def _verify_backup(out_dir: Path, scope: list[tuple[FullTable, list[dict[str, Any]], dict[str, Any]]]) -> tuple[dict[str, tuple[int, int]], list[str], dict[str, set[str]]]:
+EXPORT_STAMP = "export_started.txt"  # written by the export phase: the time its snapshot was taken (UTC, ISO)
+
+
+def _export_stamp_path(out_dir: Path) -> Path:
+    return out_dir / EXPORT_STAMP
+
+
+def _read_export_stamp(out_dir: Path) -> datetime | None:
+    try:
+        return _utc(_export_stamp_path(out_dir).read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        return None
+
+
+def _own_sync_row(row: dict[str, Any], after: datetime) -> bool:
+    """True for a Sync Log row started at or after ``after`` (the export snapshot time). The export snapshot cannot
+    contain it: the export run's own row is written after its export, and so is every row of a later run (the
+    trash phase's own row). Such rows are never counted as missing and never trashed. Rows started before
+    ``after`` are checked strictly as before."""
+    value = get_date(row, S.P_SyncLog.STARTED)
+    if value is None:
+        return False
+    if isinstance(value, datetime):
+        return as_utc(value) >= after
+    return value >= cairo_date(after)
+
+
+def _verify_backup(
+    out_dir: Path,
+    scope: list[tuple[FullTable, list[dict[str, Any]], dict[str, Any]]],
+    own_after: datetime,
+) -> tuple[dict[str, tuple[int, int]], list[str], dict[str, set[str]]]:
     """Check the CSV files on disk against the live rows. Returns ({file: (Notion rows, CSV rows)}, problems, {file: backed-up Page IDs}).
     A live row missing from its file is a problem. A file row that is no longer in Notion is not: it was backed up
-    before it left Notion (a rerun after a capped trash sees these)."""
+    before it left Notion (a rerun after a capped trash sees these). Sync Log rows started at or after ``own_after``
+    are not checked (see _own_sync_row)."""
     counts: dict[str, tuple[int, int]] = {}
     problems: list[str] = []
     backed: dict[str, set[str]] = {}
-    for table, pages, _schema in scope:
+    for table, all_pages, _schema in scope:
+        pages = all_pages
+        if table.db == S.DB_SYNC_LOG:
+            pages = [page for page in all_pages if not _own_sync_row(page, own_after)]
         path = out_dir / table.file
         if not path.is_file():
             problems.append(f"{table.file}: the CSV does not exist")
@@ -432,20 +470,34 @@ def _run_full(ctx: Context, opts: ArchiveOptions) -> JobResult:
         return JobResult(job=JOB, result=ERROR, items=0, details=f"full reset stopped, nothing written or trashed: {_short(exc)}")
 
     exported: dict[str, tuple[int, int]] = {}
+    run_start = as_utc(ctx.now)
     if opts.phase in ("all", "export"):
         try:
+            if not ctx.dry_run:
+                out_dir.mkdir(parents=True, exist_ok=True)
+                _export_stamp_path(out_dir).unlink(missing_ok=True)  # a failed export must not leave an older stamp
             for table, pages, schema in scope:
                 if not ctx.dry_run:
                     out_dir.mkdir(parents=True, exist_ok=True)
                 exported[table.file] = _export_table(repo, table, pages, schema, out_dir, ctx.dry_run)
+            if not ctx.dry_run:
+                _export_stamp_path(out_dir).write_text(run_start.isoformat(), encoding="utf-8")
         except Exception as exc:  # noqa: BLE001 - an export failure means nothing is trashed
             log.warning("full reset export failed, nothing trashed: %s", _short(exc))
             return JobResult(job=JOB, result=ERROR, items=0, details=f"full export failed, nothing trashed: {_short(exc)}")
 
+    # The export snapshot time: this run's start when this run exported; otherwise the stamp the export phase left.
+    # Without a stamp, only rows started by this run are exempt (the export of such a folder is then needed again).
+    if opts.phase in ("all", "export"):
+        own_after = run_start
+    else:
+        own_after = _read_export_stamp(out_dir) or run_start
+    own_sync_rows = sum(1 for p in next(pages for t, pages, _s in scope if t.db == S.DB_SYNC_LOG) if _own_sync_row(p, own_after))
+
     counts: dict[str, tuple[int, int]] = {}
     backed: dict[str, set[str]] = {}
     if not ctx.dry_run:
-        counts, problems, backed = _verify_backup(out_dir, scope)
+        counts, problems, backed = _verify_backup(out_dir, scope, own_after)
         if problems:
             lines = [f"full reset stopped: the CSV backup does not match Notion; nothing trashed or changed. Folder: {out_dir}"]
             lines += [f"FAILED {line}" for line in problems]
@@ -466,7 +518,7 @@ def _run_full(ctx: Context, opts: ArchiveOptions) -> JobResult:
         for table, pages, _schema in scope:
             if table.trash is None:
                 continue
-            eligible = [p for p in pages if table.trash(p)]
+            eligible = [p for p in pages if table.trash(p) and not (table.db == S.DB_SYNC_LOG and _own_sync_row(p, own_after))]
             if table.db == S.DB_TASKS:
                 kept_open_tasks = len(pages) - len(eligible)
             if ctx.dry_run:
@@ -527,6 +579,7 @@ def _run_full(ctx: Context, opts: ArchiveOptions) -> JobResult:
         lines.append("count check: skipped in a dry run (no CSV is written)")
     else:
         lines.append("count check (Notion/CSV): " + ", ".join(f"{name} {n}/{c}" for name, (n, c) in counts.items()) + " OK")
+        lines.append(f"Sync Log rows started by this reset run or after the export snapshot (not checked, never trashed): {own_sync_rows}")
     if opts.phase in ("all", "trash"):
         lines.append(
             "trashed: " + ", ".join(f"{t.db} {trashed.get(t.db, 0)}" for t in FULL_TABLES if t.trash is not None)
