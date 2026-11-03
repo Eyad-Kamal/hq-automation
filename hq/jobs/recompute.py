@@ -360,8 +360,11 @@ def daily_log_props(
     }
 
 
-def ensure_daily_log(ctx: Context, member: Member, day: date) -> dict:
-    """Create today's Daily Log row for a member if it does not exist (zeros until recompute runs)."""
+def ensure_daily_log(ctx: Context, member: Member, day: date) -> dict | None:
+    """Create today's Daily Log row for a member if it does not exist (zeros until recompute runs).
+    Returns None and writes nothing when ``day`` is before the season start (see ``Season.blocks``)."""
+    if Season(start=ctx.cfg.get(K.SEASON_START)).blocks(day):
+        return None
     key = f"{member.id}:{day.isoformat()}"
     existing = ctx.repo.find(S.DB_DAILY_LOG, S.P_DailyLog.SOURCE_KEY, key)
     if existing is not None:
@@ -511,6 +514,8 @@ def _recompute_member(
     window_days = max(0, int(num(cfg, K.DAILY_LOG_DAYS)))
     for offset in range(-window_days, 1):
         day = today + timedelta(days=offset)
+        if season.blocks(day):  # before the season start: no Daily Log row is created or rewritten
+            continue
         stat = stats.get(day, DayStat())
         day_streak = streak.compute(streak_days, day, freeze_every, freeze_max).current
         props = daily_log_props(

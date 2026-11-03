@@ -41,6 +41,12 @@ class Season:
     start: date | None
     own_starts: dict[str, date | None] = field(default_factory=dict)
 
+    def blocks(self, day: date | None) -> bool:
+        """True when the jobs must not create or rewrite a Daily Log or Weekly Summary row dated
+        ``day``: a global season start is set and ``day`` is before it. With no season it is False.
+        This is the one rule every such write goes through (recompute, daily, weekly backfill)."""
+        return self.start is not None and day is not None and day < self.start
+
     def start_for(self, member_id: str | None) -> date | None:
         """Effective start for a row linked to ``member_id``. A row with no member (or a member
         not known to this run) uses the global start."""

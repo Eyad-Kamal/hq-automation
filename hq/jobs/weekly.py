@@ -544,6 +544,8 @@ def _upsert_summary(
         S.P_WeeklySummary.REPORT: nt.p_relation([report_id] if report_id else []),
     }
     if season is not None:
+        if season.blocks(week_begin):  # before the season start: no Weekly Summary row is created or rewritten
+            return
         props[S.P_WeeklySummary.IN_SEASON] = nt.p_checkbox(in_season(week_begin, season.start_for(member_id)))
     repo.upsert(S.DB_WEEKLY_SUMMARY, S.P_WeeklySummary.SOURCE_KEY, key, props, icon=icons.icon_for(S.DB_WEEKLY_SUMMARY, props))
 

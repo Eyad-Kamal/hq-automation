@@ -200,11 +200,12 @@ def test_member_season_points_and_solved_exclude_earlier_solves_but_totals_do_no
 def test_daily_log_flags_follow_the_member_start_and_points_stay_all_time() -> None:
     w = _setup_with_season()
     _chain(w)
-    assert get_checkbox(_daily(w, w.eyad, date(2026, 10, 13)), S.P_DailyLog.IN_SEASON) is False
+    # Jobs no longer create Daily Log rows before the season start (test_season_start_writes).
     assert get_checkbox(_daily(w, w.eyad, date(2026, 10, 14)), S.P_DailyLog.IN_SEASON) is True
     assert get_checkbox(_daily(w, w.eyad, date(2026, 10, 15)), S.P_DailyLog.IN_SEASON) is True
-    assert get_checkbox(_daily(w, w.eyad, date(2026, 9, 20)), S.P_DailyLog.IN_SEASON) is False, "older window day"
-    assert abs(get_number(_daily(w, w.eyad, date(2026, 10, 13)), S.P_DailyLog.POINTS) - round(scoring.points(1200, 1150, "Live Contest"), 2)) < 1e-9
+    for pre_season in (date(2026, 10, 13), date(2026, 9, 20)):
+        key = f"{w.eyad}:{pre_season.isoformat()}"
+        assert [r for r in w.notion.rows(S.DB_DAILY_LOG) if get_text(r, S.P_DailyLog.SOURCE_KEY) == key] == []
 
 
 def test_contest_entry_flags_follow_the_member_start() -> None:

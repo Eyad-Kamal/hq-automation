@@ -257,6 +257,7 @@ row can set Date to Today. The flags update at the next recompute, which runs wi
   week of a season is the first Saturday on or after that date.
 - Season views in Notion must filter on **In Season** (checked), or on the Season Points / Season Solved
   numbers. Existing views keep showing all-time numbers.
+- Jobs do not write Daily Log or Weekly Summary rows before the season start (`Season.blocks`): recompute, the daily job and the weekly backfill skip them. Existing pre-season rows are kept as they are.
 
 ## When something goes wrong
 
