@@ -405,3 +405,52 @@ def test_missing_stamp_keeps_the_check_strict_for_older_rows(world, tmp_path) ->
     assert result.result == ERROR
     assert "sync_log.csv: 1 live Notion row(s) not in the CSV" in result.details
     assert world.notion.trashed == []
+
+
+def test_own_row_at_the_stamp_minute_is_exempt_at_minute_precision(world, tmp_path) -> None:
+    """The export stamp keeps seconds (run start 10:30:45), but Notion stores Started to the minute (10:30:00).
+    The reset run's own row, stored at the stamp's minute, is earlier than the stamp by seconds: it must still be
+    exempt, and the run must never trash it."""
+    ids = _seed_club(world)
+    out = tmp_path / "reset"
+    stamp_time = NOW.replace(second=45, microsecond=0)
+    assert _run(world, out, phase="export", now=stamp_time).result == OK
+    assert (out / archive.EXPORT_STAMP).read_text(encoding="utf-8").strip() == stamp_time.isoformat()
+    own = _sync(world, "archive same minute", NOW.replace(second=0, microsecond=0))
+    result = _run(world, out, phase="trash", now=NOW + timedelta(hours=1))
+    assert result.result == OK, result.details
+    assert "FAILED" not in result.details
+    assert own not in world.notion.trashed
+    assert ids["sync"] in world.notion.trashed
+
+
+def test_row_from_an_earlier_minute_still_fails_with_nothing_trashed(world, tmp_path) -> None:
+    """A Sync Log row from a clearly earlier run (one minute before the stamp's minute) is not exempt: the check fails
+    and nothing is trashed, not even the own row."""
+    _seed_club(world)
+    out = tmp_path / "reset"
+    stamp_time = NOW.replace(second=45, microsecond=0)
+    assert _run(world, out, phase="export", now=stamp_time).result == OK
+    own = _sync(world, "archive same minute", NOW.replace(second=0, microsecond=0))
+    earlier = _sync(world, "earlier run", NOW.replace(second=0, microsecond=0) - timedelta(minutes=1))
+    result = _run(world, out, phase="trash", now=NOW + timedelta(hours=1))
+    assert result.result == ERROR
+    assert "nothing trashed or changed" in result.details
+    assert "sync_log.csv: 1 live Notion row(s) not in the CSV" in result.details
+    assert world.notion.trashed == []
+    assert own not in world.notion.trashed and earlier not in world.notion.trashed
+
+
+def test_trash_phase_never_trashes_the_run_own_row(world, tmp_path) -> None:
+    """With the stamp at a minute with seconds, the own row (same minute) and the rows after it are exempt in the
+    trash phase; trashing only touches the older rows that were backed up."""
+    ids = _seed_club(world)
+    out = tmp_path / "reset"
+    stamp_time = NOW.replace(second=30, microsecond=0)
+    assert _run(world, out, phase="export", now=stamp_time).result == OK
+    own = _sync(world, "archive same minute", NOW.replace(second=0, microsecond=0))
+    later = _sync(world, "later run", NOW.replace(second=59, microsecond=0) + timedelta(minutes=5))
+    result = _run(world, out, phase="trash", now=NOW + timedelta(hours=1))
+    assert result.result == OK, result.details
+    assert own not in world.notion.trashed and later not in world.notion.trashed
+    assert ids["sync"] in world.notion.trashed

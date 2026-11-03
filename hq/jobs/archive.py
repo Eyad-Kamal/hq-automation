@@ -399,16 +399,19 @@ def _read_export_stamp(out_dir: Path) -> datetime | None:
 
 
 def _own_sync_row(row: dict[str, Any], after: datetime) -> bool:
-    """True for a Sync Log row started at or after ``after`` (the export snapshot time). The export snapshot cannot
-    contain it: the export run's own row is written after its export, and so is every row of a later run (the
-    trash phase's own row). Such rows are never counted as missing and never trashed. Rows started before
-    ``after`` are checked strictly as before."""
+    """True for a Sync Log row started at or after ``after`` (the export snapshot time), compared to the MINUTE.
+    Notion stores the Sync Log Started value to the minute, so ``after`` is truncated to the start of its minute
+    before comparing: a row stored at the same minute as the stamp (its seconds are dropped) is exempt. The export
+    snapshot cannot contain it: the export run's own row is written after its export, and so is every row of a later
+    run (the trash phase's own row). Such rows are never counted as missing and never trashed. Rows started before
+    that minute are checked strictly as before. A date-only value is compared by its Cairo day, as before."""
     value = get_date(row, S.P_SyncLog.STARTED)
     if value is None:
         return False
+    floor = as_utc(after).replace(second=0, microsecond=0)
     if isinstance(value, datetime):
-        return as_utc(value) >= after
-    return value >= cairo_date(after)
+        return as_utc(value) >= floor
+    return value >= cairo_date(floor)
 
 
 def _verify_backup(
